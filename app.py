@@ -189,18 +189,44 @@ if len(st.session_state.budget_lines) > 0:
     
     st.markdown("---")
 
-    # 2. DETAILED TABLE
+    # 2. DETAILED TABLE & MANAGEMENT
     st.subheader("Budget Breakdown")
     
-    # Formatting for display
+    # Display the table
     df_display = df_results.copy()
     df_display['Total Cost (€)'] = df_display['Total Cost (€)'].apply(lambda x: f"€{x:,.0f}")
     df_display['Recruiters'] = df_display['Recruiters'].apply(lambda x: f"{x:.1f}")
-    
     st.dataframe(df_display, use_container_width=True)
     
-    # Remove button
-    if st.button("Clear Model"):
+    # --- NEW REMOVE FUNCTIONALITY ---
+    st.write("### Manage Rows")
+    c_rem1, c_rem2 = st.columns([3, 1])
+    
+    with c_rem1:
+        # Create a list of options that looks like: "0. SWE - RSR (Demand: 10)"
+        # We use 'enumerate' to get the ID (0, 1, 2...) of each row
+        options = [f"{i}. {row['Workflow']} (Demand: {row['Demand']})" for i, row in enumerate(st.session_state.budget_lines)]
+        selected_to_remove = st.multiselect("Select lines to remove:", options)
+    
+    with c_rem2:
+        st.write("") # Spacing
+        st.write("") # Spacing
+        if st.button("Remove Selected"):
+            if selected_to_remove:
+                # 1. Get the ID numbers from the selection (the number before the dot)
+                indices_to_remove = [int(s.split('.')[0]) for s in selected_to_remove]
+                
+                # 2. Rebuild the list, keeping only the rows we did NOT select
+                new_list = [
+                    row for i, row in enumerate(st.session_state.budget_lines) 
+                    if i not in indices_to_remove
+                ]
+                
+                # 3. Update the session state and refresh
+                st.session_state.budget_lines = new_list
+                st.rerun()
+
+    if st.button("Clear Entire Model"):
         st.session_state.budget_lines = []
         st.rerun()
 
