@@ -4,6 +4,27 @@ import pandas as pd
 # --- PAGE CONFIGURATION ---
 st.set_page_config(page_title="Master RPO Budget Modeler", layout="wide")
 
+# --- PASSWORD PROTECTION ---
+# Initialize the session state for login
+if 'logged_in' not in st.session_state:
+    st.session_state.logged_in = False
+
+# The Logic
+if not st.session_state.logged_in:
+    st.title("🔒 Restricted Access")
+    st.markdown("This tool is for authorized budget planning only.")
+    
+    password = st.text_input("Enter Access Code:", type="password")
+    
+    if st.button("Login"):
+        if password == "1963":
+            st.session_state.logged_in = True
+            st.rerun()  # Reload the app to show the content
+        else:
+            st.error("Incorrect Access Code.")
+    
+    st.stop()  # 🛑 THIS STOPS THE CODE HERE. Nothing below runs until logged in.
+
 # --- DATA LOADING (Based on your CSVs) ---
 # In a production app, these could be loaded from external files or a database.
 
