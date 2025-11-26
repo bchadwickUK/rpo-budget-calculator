@@ -284,7 +284,19 @@ if len(st.session_state.budget_lines) > 0:
     
     # Show the table
     st.dataframe(df_display[column_order], use_container_width=True)
+    # ... (This is where your existing st.dataframe code is) ...
+    st.dataframe(df_display[column_order], use_container_width=True)
     
+    # --- EXPORT BUTTON ---
+    # Convert the raw data (not the formatted display data) to CSV
+    csv = df_results.to_csv(index=False).encode('utf-8')
+    
+    st.download_button(
+        label="📥 Download Data to CSV",
+        data=csv,
+        file_name='rpo_budget_scenario.csv',
+        mime='text/csv',
+    )
     # --- NEW REMOVE FUNCTIONALITY ---
     st.write("### Manage Rows")
     
