@@ -284,8 +284,6 @@ if len(st.session_state.budget_lines) > 0:
     
     # Show the table
     st.dataframe(df_display[column_order], use_container_width=True)
-    # ... (This is where your existing st.dataframe code is) ...
-    st.dataframe(df_display[column_order], use_container_width=True)
     
     # --- EXPORT BUTTON ---
     # Convert the raw data (not the formatted display data) to CSV
