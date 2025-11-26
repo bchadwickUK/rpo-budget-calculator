@@ -192,11 +192,30 @@ if len(st.session_state.budget_lines) > 0:
     # 2. DETAILED TABLE & MANAGEMENT
     st.subheader("Budget Breakdown")
     
-    # Display the table
+    # Prepare data for display
     df_display = df_results.copy()
+    
+    # CALCULATE USD COLUMN (New Step)
+    df_display['Total Cost ($)'] = df_display['Total Cost (€)'] * usd_rate
+    
+    # Format columns (Add €/$ symbols and commas)
     df_display['Total Cost (€)'] = df_display['Total Cost (€)'].apply(lambda x: f"€{x:,.0f}")
+    df_display['Total Cost ($)'] = df_display['Total Cost ($)'].apply(lambda x: f"${x:,.0f}")
     df_display['Recruiters'] = df_display['Recruiters'].apply(lambda x: f"{x:.1f}")
-    st.dataframe(df_display, use_container_width=True)
+    
+    # Reorder columns so Money is next to Money
+    column_order = [
+        "Workflow", "Supplier", "Demand", 
+        "High Cost %", "Low Cost %", 
+        "Total Cost (€)", "Total Cost ($)", 
+        "Recruiters"
+    ]
+    
+    # Show the table
+    st.dataframe(df_display[column_order], use_container_width=True)
+    
+    # --- NEW REMOVE FUNCTIONALITY ---
+    st.write("### Manage Rows")
     
     # --- NEW REMOVE FUNCTIONALITY ---
     st.write("### Manage Rows")
