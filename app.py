@@ -9,7 +9,6 @@ st.set_page_config(
 )
 
 # --- CUSTOM CSS (SAFE MODE) ---
-# We removed the sidebar background override to prevent color clashes
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap');
@@ -51,7 +50,6 @@ if 'logged_in' not in st.session_state:
 if not st.session_state.logged_in:
     c1, c2, c3 = st.columns([1,1,1])
     with c2:
-        # Using a reliable PNG link
         st.image("https://upload.wikimedia.org/wikipedia/commons/thumb/c/c1/Google_%22G%22_logo.svg/480px-Google_%22G%22_logo.svg.png", width=100)
         st.write("### RPO Strategy Engine")
         password = st.text_input("Passcode", type="password", label_visibility="collapsed")
@@ -183,22 +181,25 @@ with st.sidebar:
 
     total_demand = st.number_input("Demand Volume", min_value=1, value=50)
     
-    # Location Split - Reverted to Stacked Vertical List for Safety
+    # --- LOCATION SPLIT (BY CITY NAME) ---
     st.markdown("---")
     st.caption("LOCATION STRATEGY (%)")
     
-    high_pct = st.number_input("High Cost % (London/Dublin)", 0, 100, 50)
-    low_pct = st.number_input("Low Cost % (Warsaw)", 0, 100, 50)
+    # 1. London (Always High Cost)
+    lon_pct = st.number_input("London %", 0, 100, 50)
     
-    med_pct = 0
-    if curr_supplier in ['RSR', 'Cielo']: 
-        med_pct = st.number_input("Medium Cost % (Dublin - RSR/Cielo)", 0, 100, 0)
-        
-    med_low_pct = 0
+    # 2. Warsaw (Always Low Cost)
+    war_pct = st.number_input("Warsaw %", 0, 100, 50)
+    
+    # 3. Dublin (The Variable One)
+    dub_pct = st.number_input("Dublin %", 0, 100, 0)
+    
+    # 4. Birmingham (RSR Only)
+    bir_pct = 0
     if curr_supplier == 'RSR': 
-        med_low_pct = st.number_input("Med/Low Cost % (Birmingham - RSR)", 0, 100, 0)
+        bir_pct = st.number_input("Birmingham %", 0, 100, 0)
     
-    total_split = high_pct + med_pct + med_low_pct + low_pct
+    total_split = lon_pct + war_pct + dub_pct + bir_pct
     
     if total_split != 100:
         st.error(f"Total: {total_split}%")
@@ -209,17 +210,38 @@ with st.sidebar:
 
     st.write("")
     if st.button("Add to Model", disabled=btn_disabled, use_container_width=True):
-        # CALCS
-        vol_high = total_demand * (high_pct/100)
-        vol_med = total_demand * (med_pct/100)
-        vol_med_low = total_demand * (med_low_pct/100)
-        vol_low = total_demand * (low_pct/100)
-        price_high = get_price(curr_supplier, calc_tier, 'High Cost')
-        price_med = get_price(curr_supplier, calc_tier, 'Medium Cost')
-        price_med_low = get_price(curr_supplier, calc_tier, 'Medium/Low Cost')
-        price_low = get_price(curr_supplier, calc_tier, 'Low Cost')
+        # VOLUME CALCS
+        vol_lon = total_demand * (lon_pct/100)
+        vol_war = total_demand * (war_pct/100)
+        vol_dub = total_demand * (dub_pct/100)
+        vol_bir = total_demand * (bir_pct/100)
         
-        total_cost = (vol_high * price_high) + (vol_med * price_med) + (vol_med_low * price_med_low) + (vol_low * price_low)
+        # PRICE MAPPING LOGIC
+        # London -> High Cost
+        price_lon = get_price(curr_supplier, calc_tier, 'High Cost')
+        
+        # Warsaw -> Low Cost
+        price_war = get_price(curr_supplier, calc_tier, 'Low Cost')
+        
+        # Birmingham -> Med/Low Cost (RSR only)
+        price_bir = get_price(curr_supplier, calc_tier, 'Medium/Low Cost')
+        
+        # DUBLIN LOGIC SWITCH
+        if curr_supplier == 'KF':
+            # KF treats Dublin as High Cost
+            price_dub = get_price(curr_supplier, calc_tier, 'High Cost')
+        else:
+            # RSR/Cielo treat Dublin as Medium Cost
+            price_dub = get_price(curr_supplier, calc_tier, 'Medium Cost')
+
+        # TOTAL COST
+        total_cost = (
+            (vol_lon * price_lon) +
+            (vol_war * price_war) +
+            (vol_dub * price_dub) +
+            (vol_bir * price_bir)
+        )
+        
         recruiters_needed = total_demand / calc_ppr
         
         wf_display_name = selected_workflow
