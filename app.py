@@ -217,21 +217,14 @@ with st.sidebar:
         vol_bir = total_demand * (bir_pct/100)
         
         # PRICE MAPPING LOGIC
-        # London -> High Cost
         price_lon = get_price(curr_supplier, calc_tier, 'High Cost')
-        
-        # Warsaw -> Low Cost
         price_war = get_price(curr_supplier, calc_tier, 'Low Cost')
-        
-        # Birmingham -> Med/Low Cost (RSR only)
         price_bir = get_price(curr_supplier, calc_tier, 'Medium/Low Cost')
         
         # DUBLIN LOGIC SWITCH
         if curr_supplier == 'KF':
-            # KF treats Dublin as High Cost
             price_dub = get_price(curr_supplier, calc_tier, 'High Cost')
         else:
-            # RSR/Cielo treat Dublin as Medium Cost
             price_dub = get_price(curr_supplier, calc_tier, 'Medium Cost')
 
         # TOTAL COST
@@ -283,25 +276,41 @@ tab_builder, tab_strategy = st.tabs(["Builder", "Comparison"])
 with tab_builder:
     if len(st.session_state.budget_lines) > 0:
         df_results = pd.DataFrame(st.session_state.budget_lines)
+        
+        # Calculations
         total_eur = df_results['Total Cost (€)'].sum()
         total_usd = total_eur * usd_rate
         total_hc = df_results['Recruiters'].sum()
+        total_demand = df_results['Demand'].sum()
+        
+        # Calculate Average CPOA (Aggregated)
+        if total_demand > 0:
+            agg_cpoa = total_usd / total_demand
+        else:
+            agg_cpoa = 0
         
         # Google Material Card Look for Metrics
-        c1, c2, c3 = st.columns(3)
+        c1, c2, c3, c4 = st.columns(4)
         c1.metric("Forecast (USD)", f"${total_usd:,.0f}")
         c2.metric("Forecast (EUR)", f"€{total_eur:,.0f}")
-        c3.metric("Headcount", f"{total_hc:.1f}")
+        c3.metric("Avg CPOA ($)", f"${agg_cpoa:,.0f}") # New Metric
+        c4.metric("Headcount", f"{total_hc:.1f}")
         
         st.markdown("---")
         
         df_display = df_results.copy()
+        
+        # Calculate Row-Level CPOA
+        df_display['CPOA ($)'] = (df_display['Total Cost (€)'] * usd_rate) / df_display['Demand']
+        
+        # Formatting
         df_display['Total Cost ($)'] = (df_display['Total Cost (€)'] * usd_rate).apply(lambda x: f"${x:,.0f}")
         df_display['Total Cost (€)'] = df_display['Total Cost (€)'].apply(lambda x: f"€{x:,.0f}")
+        df_display['CPOA ($)'] = df_display['CPOA ($)'].apply(lambda x: f"${x:,.0f}")
         df_display['Recruiters'] = df_display['Recruiters'].apply(lambda x: f"{x:.1f}")
         
         st.dataframe(
-            df_display[["Workflow", "Supplier", "Demand", "Tier", "Total Cost ($)", "Recruiters"]], 
+            df_display[["Workflow", "Supplier", "Demand", "Tier", "CPOA ($)", "Total Cost ($)", "Recruiters"]], 
             use_container_width=True
         )
         
