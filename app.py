@@ -2,13 +2,67 @@ import streamlit as st
 import pandas as pd
 
 # --- PAGE CONFIGURATION ---
-st.set_page_config(page_title="RPO Strategy Engine", layout="wide", page_icon="📊")
+st.set_page_config(
+    page_title="RPO Strategy Engine", 
+    layout="wide", 
+    page_icon="https://upload.wikimedia.org/wikipedia/commons/5/53/Google_%22G%22_Logo.svg"
+)
 
-# --- CUSTOM CSS FOR "CLEAN LOOK" ---
+# --- GOOGLE MATERIAL DESIGN CSS ---
+# This injects CSS to override Streamlit's default look with Google colors
 st.markdown("""
 <style>
-    .block-container {padding-top: 1rem; padding-bottom: 2rem;}
-    [data-testid="stMetricValue"] {font-size: 1.8rem !important;}
+    /* Google Font Import */
+    @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap');
+    
+    html, body, [class*="css"] {
+        font-family: 'Roboto', sans-serif;
+    }
+    
+    /* Sidebar Background */
+    section[data-testid="stSidebar"] {
+        background-color: #f8f9fa; /* Google Light Grey */
+    }
+    
+    /* Primary Buttons (Google Blue) */
+    div.stButton > button:first-child {
+        background-color: #4285F4;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+        font-weight: 500;
+    }
+    div.stButton > button:first-child:hover {
+        background-color: #3367D6; /* Darker Blue on Hover */
+        color: white;
+        border: none;
+    }
+    
+    /* Secondary Buttons (Clear/Remove) - Minimalist */
+    div.stButton > button:active {
+        background-color: #e8f0fe;
+        color: #1967d2;
+    }
+
+    /* Metric Cards */
+    [data-testid="stMetricValue"] {
+        font-size: 2rem !important;
+        color: #202124; /* Google Dark Grey */
+        font-weight: 400;
+    }
+    [data-testid="stMetricLabel"] {
+        color: #5f6368; /* Google Medium Grey */
+    }
+    
+    /* Success/Info Boxes */
+    .stAlert {
+        border-radius: 8px;
+    }
+    
+    /* Table Headers */
+    thead tr th:first-child {display:none}
+    tbody th {display:none}
 </style>
 """, unsafe_allow_html=True)
 
@@ -17,20 +71,21 @@ if 'logged_in' not in st.session_state:
     st.session_state.logged_in = False
 
 if not st.session_state.logged_in:
-    c_login1, c_login2, c_login3 = st.columns([1,2,1])
-    with c_login2:
-        st.title("🔒 Restricted Access")
-        st.markdown("### Google RPO Strategy Engine")
-        password = st.text_input("Enter Access Code:", type="password")
-        if st.button("Login", type="primary"):
+    c1, c2, c3 = st.columns([1,1,1])
+    with c2:
+        st.image("https://upload.wikimedia.org/wikipedia/commons/2/2f/Google_2015_logo.svg", width=150)
+        st.write("### Internal RPO Budgeting Tool")
+        st.write("Authorized Access Only")
+        password = st.text_input("Passcode", type="password", label_visibility="collapsed")
+        if st.button("Sign In"):
             if password == "1963":
                 st.session_state.logged_in = True
                 st.rerun()
             else:
-                st.error("Incorrect Access Code.")
+                st.error("Access Denied")
         st.stop()
 
-# --- DATA & SESSION SETUP ---
+# --- DATA SETUP ---
 if 'budget_lines' not in st.session_state:
     st.session_state.budget_lines = []
 if 'scenarios' not in st.session_state:
@@ -50,9 +105,7 @@ workflow_data = {
 }
 df_workflows = pd.DataFrame(workflow_data)
 
-# 2. PRICING DATA (Condensed for brevity, assume full list is here as per previous versions)
-# NOTE: For the code to work perfectly, ensure the FULL pricing_data list from the previous step is pasted here.
-# I am including the full list below to ensure it works out of the box.
+# 2. PRICING DATA
 pricing_data = [
     {'Supplier': 'Cielo', 'Tier': 'T1', 'Cost_Type': 'High Cost', 'Price': 2485, 'PPR_Ref': '16+'},
     {'Supplier': 'Cielo', 'Tier': 'T2', 'Cost_Type': 'High Cost', 'Price': 2835, 'PPR_Ref': '13-16'},
@@ -126,63 +179,57 @@ def get_price(supplier, tier, cost_type):
     if not row.empty: return row.iloc[0]['Price']
     return 0
 
-# --- SIDEBAR: INPUT & SCENARIO MANAGER ---
+# --- SIDEBAR ---
 with st.sidebar:
-    st.header("1. Input Variables")
+    # Google Logo and Header
+    st.image("https://upload.wikimedia.org/wikipedia/commons/5/53/Google_%22G%22_Logo.svg", width=50)
+    st.markdown("### Strategy Engine")
+    st.markdown("---")
     
     # Workflow Inputs
-    selected_workflow = st.selectbox("Select Workflow:", df_workflows['Workflow Name'].unique())
+    st.caption("CONFIGURATION")
+    selected_workflow = st.selectbox("Select Workflow", df_workflows['Workflow Name'].unique())
     wf_details = df_workflows[df_workflows['Workflow Name'] == selected_workflow].iloc[0]
     curr_supplier = wf_details['Supplier']
     
-    # Efficiency Toggle (Using Expander to clean up UI)
-    with st.expander("🛠️ Efficiency / PPR Settings"):
+    # Efficiency Toggle
+    with st.expander("🛠️  Efficiency / PPR Settings"):
         efficiency_mode = st.checkbox("Enable Efficiency Override", value=False)
         if efficiency_mode:
             st.info(f"Modifying {curr_supplier}")
-            # Show Ref Table
-            ref_table = df_pricing[(df_pricing['Supplier'] == curr_supplier) & (df_pricing['Cost_Type'] == 'High Cost') & (df_pricing['PPR_Ref'].notna())][['Tier', 'PPR_Ref']].sort_values('Tier')
-            st.dataframe(ref_table, hide_index=True, use_container_width=True)
             calc_ppr = st.number_input("Target PPR:", value=float(wf_details['Avg PPR']), step=0.5)
             calc_tier = st.selectbox("New Tier:", ['T1','T2','T3','T4','T5','T6','T7'], index=['T1','T2','T3','T4','T5','T6','T7'].index(wf_details['Pricing Tier']))
         else:
             calc_ppr = wf_details['Avg PPR']
             calc_tier = wf_details['Pricing Tier']
-            st.caption(f"Default: PPR {calc_ppr} | Tier {calc_tier}")
 
-    total_demand = st.number_input("Demand Volume:", min_value=1, value=50)
+    total_demand = st.number_input("Demand Volume", min_value=1, value=50)
     
-    # Location Split (Grid Layout for better use of space)
-    st.write("**Location Split (%)**")
+    # Location Split
+    st.caption("LOCATION STRATEGY (%)")
     c_loc1, c_loc2 = st.columns(2)
-    
     with c_loc1:
         high_pct = st.number_input("High (Lon)", 0, 100, 50)
         low_pct = st.number_input("Low (War)", 0, 100, 50)
-    
     with c_loc2:
         med_pct = 0
-        if curr_supplier in ['RSR', 'Cielo']:
-            med_pct = st.number_input("Med (Dub)", 0, 100, 0)
-        else:
-            st.markdown("n/a") # Spacer
+        if curr_supplier in ['RSR', 'Cielo']: med_pct = st.number_input("Med (Dub)", 0, 100, 0)
+        else: st.markdown("n/a")
         
         med_low_pct = 0
-        if curr_supplier == 'RSR':
-            med_low_pct = st.number_input("Med/Low (Bir)", 0, 100, 0)
-        else:
-            st.markdown("n/a") # Spacer
+        if curr_supplier == 'RSR': med_low_pct = st.number_input("Med/Low (Bir)", 0, 100, 0)
+        else: st.markdown("n/a")
     
     total_split = high_pct + med_pct + med_low_pct + low_pct
     
     if total_split != 100:
-        st.error(f"Total: {total_split}% (Fix required)")
+        st.error(f"Total: {total_split}%")
         btn_disabled = True
     else:
-        st.caption("Split: 100% ✅")
         btn_disabled = False
 
-    if st.button("Add to Model", disabled=btn_disabled, type="primary"):
+    st.write("")
+    if st.button("Add to Model", disabled=btn_disabled):
         # CALCS
         vol_high = total_demand * (high_pct/100)
         vol_med = total_demand * (med_pct/100)
@@ -203,7 +250,6 @@ with st.sidebar:
             "Workflow": wf_display_name,
             "Supplier": curr_supplier,
             "Demand": total_demand,
-            "PPR": calc_ppr,
             "Tier": calc_tier,
             "Total Cost (€)": total_cost,
             "Recruiters": recruiters_needed
@@ -212,9 +258,9 @@ with st.sidebar:
 
     # --- SCENARIO MANAGER ---
     st.markdown("---")
-    st.header("2. Scenarios")
+    st.caption("SCENARIO MANAGER")
     
-    scenario_name = st.text_input("Scenario Name (e.g. Option A):")
+    scenario_name = st.text_input("Name Scenario", placeholder="e.g. Option A")
     c_save, c_clear = st.columns(2)
     with c_save:
         if st.button("💾 Save"):
@@ -226,33 +272,28 @@ with st.sidebar:
             st.session_state.budget_lines = []
             st.rerun()
 
-# --- MAIN PAGE DISPLAY ---
-
-st.title("📊 RPO Strategy Engine")
+# --- MAIN PAGE ---
+st.title("RPO Budget & Strategy Engine")
 usd_rate = 1.15
 
-# TABS FOR CLEANER LAYOUT
-tab_builder, tab_strategy = st.tabs(["📝 Model Builder", "⚔️ Scenario Comparison"])
+tab_builder, tab_strategy = st.tabs(["Builder", "Comparison"])
 
 # --- TAB 1: BUILDER ---
 with tab_builder:
     if len(st.session_state.budget_lines) > 0:
         df_results = pd.DataFrame(st.session_state.budget_lines)
-        
-        # HEADLINE METRICS
         total_eur = df_results['Total Cost (€)'].sum()
         total_usd = total_eur * usd_rate
-        total_headcount = df_results['Recruiters'].sum()
+        total_hc = df_results['Recruiters'].sum()
         
+        # Google Material Card Look for Metrics
         c1, c2, c3 = st.columns(3)
-        c1.metric("Total Spend (USD)", f"${total_usd:,.0f}")
-        c2.metric("Total Spend (EUR)", f"€{total_eur:,.0f}")
-        c3.metric("Headcount Required", f"{total_headcount:.1f}")
+        c1.metric("Forecast (USD)", f"${total_usd:,.0f}")
+        c2.metric("Forecast (EUR)", f"€{total_eur:,.0f}")
+        c3.metric("Headcount", f"{total_hc:.1f}")
         
-        st.divider()
-
-        # CLEAN TABLE
-        st.subheader("Current Workflows")
+        st.markdown("---")
+        
         df_display = df_results.copy()
         df_display['Total Cost ($)'] = (df_display['Total Cost (€)'] * usd_rate).apply(lambda x: f"${x:,.0f}")
         df_display['Total Cost (€)'] = df_display['Total Cost (€)'].apply(lambda x: f"€{x:,.0f}")
@@ -263,8 +304,7 @@ with tab_builder:
             use_container_width=True
         )
         
-        # HIDDEN EDIT/REMOVE SECTION
-        with st.expander("Manage / Remove Rows"):
+        with st.expander("Edit / Remove Items"):
             options = [f"{i}. {row['Workflow']}" for i, row in enumerate(st.session_state.budget_lines)]
             selected_to_remove = st.multiselect("Select lines to remove:", options)
             if st.button("Remove Selected"):
@@ -273,8 +313,7 @@ with tab_builder:
                     st.session_state.budget_lines = [r for i, r in enumerate(st.session_state.budget_lines) if i not in indices]
                     st.rerun()
     else:
-        st.info("👈 Start by adding a workflow from the sidebar.")
-        st.image("https://cdn-icons-png.flaticon.com/512/7603/7603953.png", width=100)
+        st.info("👈 Use the sidebar to add your first workflow.")
 
 # --- TAB 2: STRATEGY ---
 with tab_strategy:
@@ -312,18 +351,19 @@ with tab_strategy:
             elif diff > 0:
                 st.warning(f"**Insight:** **{prop['Scenario']}** is **${abs(diff_usd):,.0f}** more expensive than **{base['Scenario']}**.")
 
-        # SIDE BY SIDE CHARTS
+        # SIDE BY SIDE CHARTS (GOOGLE COLORS)
         c_chart1, c_chart2 = st.columns(2)
         with c_chart1:
             st.caption("Spend Comparison (€)")
+            # Google Blue
             st.bar_chart(df_comp, x='Scenario', y='Cost (€)', color="#4285F4")
         with c_chart2:
             st.caption("Headcount Comparison")
+            # Google Red
             st.bar_chart(df_comp, x='Scenario', y='Recruiters', color="#DB4437")
 
-        # DATA TABLE
-        st.divider()
-        st.subheader("Detailed Comparison Data")
+        st.markdown("---")
+        st.subheader("Data Breakdown")
         df_comp['Cost ($)'] = (df_comp['Cost (€)'] * usd_rate).apply(lambda x: f"${x:,.0f}")
         df_comp['Cost (€)'] = df_comp['Cost (€)'].apply(lambda x: f"€{x:,.0f}")
         df_comp['Recruiters'] = df_comp['Recruiters'].apply(lambda x: f"{x:.1f}")
@@ -334,4 +374,4 @@ with tab_strategy:
             st.rerun()
             
     else:
-        st.info("Save at least one scenario in the sidebar to activate the Strategy Room.")
+        st.info("Save a scenario in the sidebar to view comparisons.")
