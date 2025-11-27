@@ -69,17 +69,19 @@ if 'scenarios' not in st.session_state:
 
 # 1. WORKFLOW DATA
 workflow_data = {
-    'Workflow Name': [
-        'SWE - RSR', 'SWE - KF', 'SWE - CIELO',
-        'SRE - RSR', 'SRE - KF', 'SRE - CIELO',
-        'TPgM - RSR', 'TPgM - KF', 'TPgM - CIELO',
-        'GBOFx - RSR', 'GBOFx - KF', 'GBOFx - CIELO'
+    'Role': [
+        'SWE', 'SWE', 'SWE',
+        'SRE', 'SRE', 'SRE',
+        'TPgM', 'TPgM', 'TPgM',
+        'GBOFx', 'GBOFx', 'GBOFx'
     ],
     'Supplier': ['RSR', 'KF', 'Cielo'] * 4,
     'Pricing Tier': ['T6', 'T6', 'T6'] * 3 + ['T4', 'T4', 'T4'],
     'Avg PPR': [6, 6, 6, 6.5, 6.5, 6.5, 6, 6, 6, 9, 9, 9]
 }
 df_workflows = pd.DataFrame(workflow_data)
+# Create the full name automatically to keep the rest of the app working
+df_workflows['Workflow Name'] = df_workflows['Role'] + " - " + df_workflows['Supplier']
 
 # 2. PRICING DATA
 pricing_data = [
@@ -164,9 +166,27 @@ with st.sidebar:
     
     # Workflow Inputs
     st.caption("CONFIGURATION")
-    selected_workflow = st.selectbox("Select Workflow", df_workflows['Workflow Name'].unique())
-    wf_details = df_workflows[df_workflows['Workflow Name'] == selected_workflow].iloc[0]
+    
+    # 1. SELECT ROLE
+    unique_roles = df_workflows['Role'].unique()
+    selected_role = st.selectbox("1. Select Role / Job Family", unique_roles)
+    
+    # 2. SELECT SUPPLIER (Filtered by Role)
+    # We only show suppliers that actually handle the selected role
+    available_suppliers = df_workflows[df_workflows['Role'] == selected_role]['Supplier'].unique()
+    selected_supplier = st.selectbox("2. Select Supplier", available_suppliers)
+    
+    # RECONSTRUCT THE WORKFLOW OBJECT
+    # The rest of your app expects a single row of data, so we find it here
+    wf_details = df_workflows[
+        (df_workflows['Role'] == selected_role) & 
+        (df_workflows['Supplier'] == selected_supplier)
+    ].iloc[0]
+    
+    selected_workflow = wf_details['Workflow Name']
     curr_supplier = wf_details['Supplier']
+    
+    # ... (The rest of your code: Efficiency Toggle, Demand, etc. continues here) ...
     
     # Efficiency Toggle
     with st.expander("🛠️  Efficiency / PPR Settings"):
