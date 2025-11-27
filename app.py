@@ -9,7 +9,7 @@ st.set_page_config(
 )
 
 # --- CUSTOM CSS (SAFE MODE) ---
-# Removed sidebar background color override to fix white-on-white text issue
+# Minimal styling to ensure Dark/Light mode compatibility while keeping Google colors
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap');
@@ -285,7 +285,11 @@ with st.sidebar:
             "Demand": total_demand,
             "Tier": calc_tier,
             "Total Cost (€)": total_cost,
-            "Recruiters": recruiters_needed
+            "Recruiters": recruiters_needed,
+            "Lon OA": vol_lon,
+            "War OA": vol_war,
+            "Dub OA": vol_dub,
+            "Bir OA": vol_bir
         }
 
         # 3. ROUTE TO CORRECT BUCKET
@@ -332,8 +336,12 @@ if mode == "📝 Budget Builder":
         df_display['CPOA ($)'] = df_display['CPOA ($)'].apply(lambda x: f"${x:,.0f}")
         df_display['Recruiters'] = df_display['Recruiters'].apply(lambda x: f"{x:.1f}")
         
+        # Format Location OA Columns
+        for col in ["Lon OA", "War OA", "Dub OA", "Bir OA"]:
+            df_display[col] = df_display[col].apply(lambda x: f"{x:.1f}")
+
         st.dataframe(
-            df_display[["Workflow", "Supplier", "Demand", "Tier", "CPOA ($)", "Total Cost ($)", "Recruiters"]], 
+            df_display[["Workflow", "Supplier", "Demand", "Lon OA", "War OA", "Dub OA", "Bir OA", "CPOA ($)", "Total Cost ($)", "Recruiters"]], 
             use_container_width=True
         )
         
@@ -403,7 +411,7 @@ elif mode == "⚖️ Comparison":
             
             st.dataframe(df_comp[['Scenario', 'Cost ($)', 'CPOA ($)', 'Recruiters']], use_container_width=True)
 
-           
+            # Manage Scenarios
             with st.expander("Manage Scenarios"):
                 c_del1, c_del2 = st.columns(2)
                 
@@ -419,7 +427,7 @@ elif mode == "⚖️ Comparison":
                     st.write("")
                     if st.button("🗑️ Delete ALL Scenarios", type="primary"):
                         st.session_state.scenarios = {}
-                        st.rerun()# Manage Scenarios
+                        st.rerun()
         else:
              st.info("Scenarios created, but they are empty. Add items using the sidebar.")
     else:
