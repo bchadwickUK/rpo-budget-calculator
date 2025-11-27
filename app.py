@@ -290,7 +290,7 @@ st.markdown("---")
 if len(st.session_state.scenarios) > 0:
     st.header("⚔️ Scenario Comparison")
     
-    # Prepare comparison data
+    # 1. Prepare comparison data
     comp_data = []
     
     # Add Saved Scenarios
@@ -308,7 +308,26 @@ if len(st.session_state.scenarios) > 0:
     
     df_comp = pd.DataFrame(comp_data)
     
-    # Show Comparison Metrics
+    # 2. Calculate Price Delta (vs the first item in the list)
+    if not df_comp.empty:
+        # The Baseline is the first scenario added
+        baseline_cost = df_comp.iloc[0]['Cost (€)']
+        
+        # Calculate numeric delta
+        df_comp['numeric_delta'] = df_comp['Cost (€)'] - baseline_cost
+        
+        # Function to format the Delta column nicely
+        def format_delta(val):
+            if val == 0:
+                return "Baseline"
+            elif val < 0:
+                return f"-€{abs(val):,.0f} (Save) 📉"
+            else:
+                return f"+€{val:,.0f} (Cost) 📈"
+        
+        df_comp['Price Delta'] = df_comp['numeric_delta'].apply(format_delta)
+
+    # 3. Display Results
     col_chart, col_data = st.columns([2, 1])
     
     with col_chart:
@@ -317,10 +336,18 @@ if len(st.session_state.scenarios) > 0:
         
     with col_data:
         st.subheader("Data Comparison")
+        
+        # Formatting for the table view
         df_comp['Cost ($)'] = (df_comp['Cost (€)'] * usd_rate).apply(lambda x: f"${x:,.0f}")
         df_comp['Cost (€)'] = df_comp['Cost (€)'].apply(lambda x: f"€{x:,.0f}")
         df_comp['Recruiters'] = df_comp['Recruiters'].apply(lambda x: f"{x:.1f}")
-        st.dataframe(df_comp[['Scenario', 'Cost (€)', 'Cost ($)', 'Recruiters']], hide_index=True)
+        
+        # Show specific columns including the new Delta
+        st.dataframe(
+            df_comp[['Scenario', 'Cost (€)', 'Price Delta', 'Recruiters']], 
+            hide_index=True,
+            use_container_width=True
+        )
         
     if st.button("🗑️ Clear All Saved Scenarios"):
         st.session_state.scenarios = {}
