@@ -284,7 +284,7 @@ if len(st.session_state.budget_lines) > 0:
 else:
     st.info("👈 Use the sidebar to add your first workflow.")
 
-# --- COMPARISON ENGINE ---
+# --- COMPARISON ENGINE & EXECUTIVE SUMMARY ---
 st.markdown("---")
 
 if len(st.session_state.scenarios) > 0:
@@ -308,26 +308,53 @@ if len(st.session_state.scenarios) > 0:
     
     df_comp = pd.DataFrame(comp_data)
     
-    # 2. Calculate Price Delta (vs the first item in the list)
-    if not df_comp.empty:
-        # The Baseline is the first scenario added
-        baseline_cost = df_comp.iloc[0]['Cost (€)']
+    # 2. EXECUTIVE SUMMARY LOGIC
+    # We compare the Last Item (Proposed) vs First Item (Baseline)
+    if len(df_comp) >= 2:
+        baseline_row = df_comp.iloc[0]
+        proposal_row = df_comp.iloc[-1]
         
-        # Calculate numeric delta
-        df_comp['numeric_delta'] = df_comp['Cost (€)'] - baseline_cost
+        diff_val = proposal_row['Cost (€)'] - baseline_row['Cost (€)']
+        diff_pct = (diff_val / baseline_row['Cost (€)']) * 100 if baseline_row['Cost (€)'] != 0 else 0
+        diff_usd = diff_val * usd_rate
         
-        # Function to format the Delta column nicely
-        def format_delta(val):
-            if val == 0:
-                return "Baseline"
-            elif val < 0:
-                return f"-€{abs(val):,.0f} (Save) 📉"
-            else:
-                return f"+€{val:,.0f} (Cost) 📈"
-        
-        df_comp['Price Delta'] = df_comp['numeric_delta'].apply(format_delta)
+        # Determine the language
+        if diff_val < 0:
+            # SAVINGS
+            summary_color = "success" # Green box
+            summary_icon = "📉"
+            summary_text = (
+                f"**Opportunity Identified:** By adopting **{proposal_row['Scenario']}**, "
+                f"you would save **€{abs(diff_val):,.0f}** (${abs(diff_usd):,.0f}) "
+                f"compared to **{baseline_row['Scenario']}**.\n\n"
+                f"This represents a **{abs(diff_pct):.1f}%** reduction in total spend."
+            )
+        elif diff_val > 0:
+            # COST INCREASE
+            summary_color = "warning" # Yellow/Orange box
+            summary_icon = "📈"
+            summary_text = (
+                f"**Investment Required:** **{proposal_row['Scenario']}** would require an additional "
+                f"**€{diff_val:,.0f}** (${diff_usd:,.0f}) compared to **{baseline_row['Scenario']}**.\n\n"
+                f"This represents a **{diff_pct:.1f}%** increase in total budget."
+            )
+        else:
+            summary_color = "info"
+            summary_icon = "⚖️"
+            summary_text = f"**No Change:** {proposal_row['Scenario']} has the same cost profile as {baseline_row['Scenario']}."
 
-    # 3. Display Results
+        # DISPLAY THE SUMMARY BOX
+        with st.container():
+            if summary_color == "success":
+                st.success(f"### {summary_icon} Executive Summary\n\n{summary_text}")
+            elif summary_color == "warning":
+                st.warning(f"### {summary_icon} Executive Summary\n\n{summary_text}")
+            else:
+                st.info(f"### {summary_icon} Executive Summary\n\n{summary_text}")
+            st.caption("Figures calculated based on FX Rate 1.15")
+
+    # 3. VISUALS (Chart & Table)
+    st.write("") # Spacing
     col_chart, col_data = st.columns([2, 1])
     
     with col_chart:
@@ -335,14 +362,21 @@ if len(st.session_state.scenarios) > 0:
         st.bar_chart(df_comp, x='Scenario', y='Cost (€)', color="#34A853")
         
     with col_data:
-        st.subheader("Data Comparison")
+        st.subheader("Data Table")
         
-        # Formatting for the table view
-        df_comp['Cost ($)'] = (df_comp['Cost (€)'] * usd_rate).apply(lambda x: f"${x:,.0f}")
+        # Calculate numeric delta for the table view
+        baseline_cost = df_comp.iloc[0]['Cost (€)']
+        df_comp['numeric_delta'] = df_comp['Cost (€)'] - baseline_cost
+        
+        def format_delta(val):
+            if val == 0: return "Baseline"
+            elif val < 0: return f"-€{abs(val):,.0f}"
+            else: return f"+€{val:,.0f}"
+        
+        df_comp['Price Delta'] = df_comp['numeric_delta'].apply(format_delta)
         df_comp['Cost (€)'] = df_comp['Cost (€)'].apply(lambda x: f"€{x:,.0f}")
         df_comp['Recruiters'] = df_comp['Recruiters'].apply(lambda x: f"{x:.1f}")
         
-        # Show specific columns including the new Delta
         st.dataframe(
             df_comp[['Scenario', 'Cost (€)', 'Price Delta', 'Recruiters']], 
             hide_index=True,
