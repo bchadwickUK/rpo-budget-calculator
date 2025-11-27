@@ -8,18 +8,14 @@ st.set_page_config(
     page_icon="📊"
 )
 
-# --- CUSTOM CSS (GOOGLE MATERIAL DESIGN) ---
+# --- CUSTOM CSS (SAFE MODE) ---
+# Removed sidebar background color override to fix white-on-white text issue
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap');
     
     html, body, [class*="css"] {
         font-family: 'Roboto', sans-serif;
-    }
-    
-    /* Sidebar Styling */
-    section[data-testid="stSidebar"] {
-        background-color: #f8f9fa;
     }
     
     /* Primary Buttons (Google Blue) */
@@ -40,7 +36,6 @@ st.markdown("""
     [data-testid="stMetricValue"] {
         font-size: 2rem !important;
         font-weight: 400;
-        color: #202124;
     }
     
     /* Clean up tables */
