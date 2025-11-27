@@ -403,13 +403,23 @@ elif mode == "⚖️ Comparison":
             
             st.dataframe(df_comp[['Scenario', 'Cost ($)', 'CPOA ($)', 'Recruiters']], use_container_width=True)
 
-            # Manage Scenarios
+           
             with st.expander("Manage Scenarios"):
-                to_delete = st.selectbox("Delete a Scenario:", ["None"] + list(st.session_state.scenarios.keys()))
-                if st.button("Delete Selected"):
-                    if to_delete != "None":
-                        del st.session_state.scenarios[to_delete]
-                        st.rerun()
+                c_del1, c_del2 = st.columns(2)
+                
+                with c_del1:
+                    to_delete = st.selectbox("Delete a Scenario:", ["None"] + list(st.session_state.scenarios.keys()))
+                    if st.button("Delete Selected"):
+                        if to_delete != "None":
+                            del st.session_state.scenarios[to_delete]
+                            st.rerun()
+                
+                with c_del2:
+                    st.write("") # Spacer for alignment
+                    st.write("")
+                    if st.button("🗑️ Delete ALL Scenarios", type="primary"):
+                        st.session_state.scenarios = {}
+                        st.rerun()# Manage Scenarios
         else:
              st.info("Scenarios created, but they are empty. Add items using the sidebar.")
     else:
