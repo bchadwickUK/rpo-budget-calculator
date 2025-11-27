@@ -5,23 +5,17 @@ import pandas as pd
 st.set_page_config(
     page_title="RPO Strategy Engine", 
     layout="wide", 
-    page_icon="https://upload.wikimedia.org/wikipedia/commons/5/53/Google_%22G%22_Logo.svg"
+    page_icon="📊"
 )
 
-# --- GOOGLE MATERIAL DESIGN CSS ---
-# This injects CSS to override Streamlit's default look with Google colors
+# --- CUSTOM CSS (SAFE MODE) ---
+# We removed the sidebar background override to prevent color clashes
 st.markdown("""
 <style>
-    /* Google Font Import */
     @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap');
     
     html, body, [class*="css"] {
         font-family: 'Roboto', sans-serif;
-    }
-    
-    /* Sidebar Background */
-    section[data-testid="stSidebar"] {
-        background-color: #f8f9fa; /* Google Light Grey */
     }
     
     /* Primary Buttons (Google Blue) */
@@ -34,33 +28,17 @@ st.markdown("""
         font-weight: 500;
     }
     div.stButton > button:first-child:hover {
-        background-color: #3367D6; /* Darker Blue on Hover */
+        background-color: #3367D6;
         color: white;
-        border: none;
-    }
-    
-    /* Secondary Buttons (Clear/Remove) - Minimalist */
-    div.stButton > button:active {
-        background-color: #e8f0fe;
-        color: #1967d2;
     }
 
-    /* Metric Cards */
+    /* Metric Cards styling */
     [data-testid="stMetricValue"] {
         font-size: 2rem !important;
-        color: #202124; /* Google Dark Grey */
         font-weight: 400;
     }
-    [data-testid="stMetricLabel"] {
-        color: #5f6368; /* Google Medium Grey */
-    }
     
-    /* Success/Info Boxes */
-    .stAlert {
-        border-radius: 8px;
-    }
-    
-    /* Table Headers */
+    /* Clean up tables */
     thead tr th:first-child {display:none}
     tbody th {display:none}
 </style>
@@ -73,9 +51,9 @@ if 'logged_in' not in st.session_state:
 if not st.session_state.logged_in:
     c1, c2, c3 = st.columns([1,1,1])
     with c2:
-        st.image("https://upload.wikimedia.org/wikipedia/commons/2/2f/Google_2015_logo.svg", width=150)
-        st.write("### Internal RPO Budgeting Tool")
-        st.write("Authorized Access Only")
+        # Using a reliable PNG link
+        st.image("https://upload.wikimedia.org/wikipedia/commons/thumb/c/c1/Google_%22G%22_logo.svg/480px-Google_%22G%22_logo.svg.png", width=100)
+        st.write("### RPO Strategy Engine")
         password = st.text_input("Passcode", type="password", label_visibility="collapsed")
         if st.button("Sign In"):
             if password == "1963":
@@ -181,8 +159,8 @@ def get_price(supplier, tier, cost_type):
 
 # --- SIDEBAR ---
 with st.sidebar:
-    # Google Logo and Header
-    st.image("https://upload.wikimedia.org/wikipedia/commons/5/53/Google_%22G%22_Logo.svg", width=50)
+    # Google Logo (PNG)
+    st.image("https://upload.wikimedia.org/wikipedia/commons/thumb/c/c1/Google_%22G%22_logo.svg/480px-Google_%22G%22_logo.svg.png", width=40)
     st.markdown("### Strategy Engine")
     st.markdown("---")
     
@@ -205,20 +183,20 @@ with st.sidebar:
 
     total_demand = st.number_input("Demand Volume", min_value=1, value=50)
     
-    # Location Split
+    # Location Split - Reverted to Stacked Vertical List for Safety
+    st.markdown("---")
     st.caption("LOCATION STRATEGY (%)")
-    c_loc1, c_loc2 = st.columns(2)
-    with c_loc1:
-        high_pct = st.number_input("High (Lon)", 0, 100, 50)
-        low_pct = st.number_input("Low (War)", 0, 100, 50)
-    with c_loc2:
-        med_pct = 0
-        if curr_supplier in ['RSR', 'Cielo']: med_pct = st.number_input("Med (Dub)", 0, 100, 0)
-        else: st.markdown("n/a")
+    
+    high_pct = st.number_input("High Cost % (London/Dublin)", 0, 100, 50)
+    low_pct = st.number_input("Low Cost % (Warsaw)", 0, 100, 50)
+    
+    med_pct = 0
+    if curr_supplier in ['RSR', 'Cielo']: 
+        med_pct = st.number_input("Medium Cost % (Dublin - RSR/Cielo)", 0, 100, 0)
         
-        med_low_pct = 0
-        if curr_supplier == 'RSR': med_low_pct = st.number_input("Med/Low (Bir)", 0, 100, 0)
-        else: st.markdown("n/a")
+    med_low_pct = 0
+    if curr_supplier == 'RSR': 
+        med_low_pct = st.number_input("Med/Low Cost % (Birmingham - RSR)", 0, 100, 0)
     
     total_split = high_pct + med_pct + med_low_pct + low_pct
     
@@ -226,10 +204,11 @@ with st.sidebar:
         st.error(f"Total: {total_split}%")
         btn_disabled = True
     else:
+        st.success("Split: 100%")
         btn_disabled = False
 
     st.write("")
-    if st.button("Add to Model", disabled=btn_disabled):
+    if st.button("Add to Model", disabled=btn_disabled, use_container_width=True):
         # CALCS
         vol_high = total_demand * (high_pct/100)
         vol_med = total_demand * (med_pct/100)
@@ -254,23 +233,23 @@ with st.sidebar:
             "Total Cost (€)": total_cost,
             "Recruiters": recruiters_needed
         })
-        st.success("Added!")
+        st.toast("Workflow Added!")
 
     # --- SCENARIO MANAGER ---
     st.markdown("---")
     st.caption("SCENARIO MANAGER")
     
     scenario_name = st.text_input("Name Scenario", placeholder="e.g. Option A")
-    c_save, c_clear = st.columns(2)
-    with c_save:
-        if st.button("💾 Save"):
-            if len(st.session_state.budget_lines) > 0 and scenario_name:
-                st.session_state.scenarios[scenario_name] = list(st.session_state.budget_lines)
-                st.toast(f"Saved '{scenario_name}'!")
-    with c_clear:
-        if st.button("🗑️ Clear"):
-            st.session_state.budget_lines = []
-            st.rerun()
+    
+    if st.button("💾 Save Snapshot", use_container_width=True):
+        if len(st.session_state.budget_lines) > 0 and scenario_name:
+            st.session_state.scenarios[scenario_name] = list(st.session_state.budget_lines)
+            st.toast(f"Saved '{scenario_name}'!")
+    
+    st.write("")
+    if st.button("🗑️ Clear Current", use_container_width=True):
+        st.session_state.budget_lines = []
+        st.rerun()
 
 # --- MAIN PAGE ---
 st.title("RPO Budget & Strategy Engine")
@@ -355,11 +334,9 @@ with tab_strategy:
         c_chart1, c_chart2 = st.columns(2)
         with c_chart1:
             st.caption("Spend Comparison (€)")
-            # Google Blue
             st.bar_chart(df_comp, x='Scenario', y='Cost (€)', color="#4285F4")
         with c_chart2:
             st.caption("Headcount Comparison")
-            # Google Red
             st.bar_chart(df_comp, x='Scenario', y='Recruiters', color="#DB4437")
 
         st.markdown("---")
