@@ -86,27 +86,13 @@ df_workflows['Workflow Name'] = df_workflows['Role'] + " - " + df_workflows['Sup
 
 # 2. PRICING DATA
 pricing_data = [
-    {'Supplier': 'Cielo', 'Tier': 'T1', 'Cost_Type': 'High Cost', 'Price': 2485},
-    {'Supplier': 'Cielo', 'Tier': 'T2', 'Cost_Type': 'High Cost', 'Price': 2835},
-    {'Supplier': 'Cielo', 'Tier': 'T3', 'Cost_Type': 'High Cost', 'Price': 3595},
-    {'Supplier': 'Cielo', 'Tier': 'T4', 'Cost_Type': 'High Cost', 'Price': 4290},
-    {'Supplier': 'Cielo', 'Tier': 'T5', 'Cost_Type': 'High Cost', 'Price': 4688},
-    {'Supplier': 'Cielo', 'Tier': 'T6', 'Cost_Type': 'High Cost', 'Price': 5938},
-    {'Supplier': 'Cielo', 'Tier': 'T7', 'Cost_Type': 'High Cost', 'Price': 7538},
-    {'Supplier': 'Cielo', 'Tier': 'T1', 'Cost_Type': 'Medium Cost', 'Price': 2207},
-    {'Supplier': 'Cielo', 'Tier': 'T2', 'Cost_Type': 'Medium Cost', 'Price': 2527},
-    {'Supplier': 'Cielo', 'Tier': 'T3', 'Cost_Type': 'Medium Cost', 'Price': 3217},
-    {'Supplier': 'Cielo', 'Tier': 'T4', 'Cost_Type': 'Medium Cost', 'Price': 3857},
-    {'Supplier': 'Cielo', 'Tier': 'T5', 'Cost_Type': 'Medium Cost', 'Price': 4204},
-    {'Supplier': 'Cielo', 'Tier': 'T6', 'Cost_Type': 'Medium Cost', 'Price': 5343},
-    {'Supplier': 'Cielo', 'Tier': 'T7', 'Cost_Type': 'Medium Cost', 'Price': 6793},
-    {'Supplier': 'Cielo', 'Tier': 'T1', 'Cost_Type': 'Low Cost', 'Price': 1637},
-    {'Supplier': 'Cielo', 'Tier': 'T2', 'Cost_Type': 'Low Cost', 'Price': 1867},
-    {'Supplier': 'Cielo', 'Tier': 'T3', 'Cost_Type': 'Low Cost', 'Price': 2367},
-    {'Supplier': 'Cielo', 'Tier': 'T4', 'Cost_Type': 'Low Cost', 'Price': 2817},
-    {'Supplier': 'Cielo', 'Tier': 'T5', 'Cost_Type': 'Low Cost', 'Price': 3089},
-    {'Supplier': 'Cielo', 'Tier': 'T6', 'Cost_Type': 'Low Cost', 'Price': 3899},
-    {'Supplier': 'Cielo', 'Tier': 'T7', 'Cost_Type': 'Low Cost', 'Price': 4939},
+    {'Supplier': 'Cielo', 'Tier': 'T1', 'Cost_Type': 'Blended', 'Price': 1923},
+    {'Supplier': 'Cielo', 'Tier': 'T2', 'Cost_Type': 'Blended', 'Price': 2207},
+    {'Supplier': 'Cielo', 'Tier': 'T3', 'Cost_Type': 'Blended', 'Price': 2824},
+    {'Supplier': 'Cielo', 'Tier': 'T4', 'Cost_Type': 'Blended', 'Price': 3384},
+    {'Supplier': 'Cielo', 'Tier': 'T5', 'Cost_Type': 'Blended', 'Price': 3809},
+    {'Supplier': 'Cielo', 'Tier': 'T6', 'Cost_Type': 'Blended', 'Price': 4817},
+    {'Supplier': 'Cielo', 'Tier': 'T7', 'Cost_Type': 'Blended', 'Price': 6109},
     {'Supplier': 'RSR', 'Tier': 'T1', 'Cost_Type': 'High Cost', 'Price': 3359},
     {'Supplier': 'RSR', 'Tier': 'T2', 'Cost_Type': 'High Cost', 'Price': 4079},
     {'Supplier': 'RSR', 'Tier': 'T3', 'Cost_Type': 'High Cost', 'Price': 5191},
@@ -226,23 +212,28 @@ with st.sidebar:
             calc_ppr = wf_details['Avg PPR']
             calc_tier = wf_details['Pricing Tier']
 
-    # Volume & Locations
+# Volume & Locations
     total_demand = st.number_input("Demand Volume", min_value=1, value=50)
     
-    st.caption("LOCATION SPLIT (%)")
-    lon_pct = st.number_input("London %", 0, 100, 50)
-    war_pct = st.number_input("Warsaw %", 0, 100, 50)
+    # Check if Cielo (Blended) is selected
+    is_blended = (curr_supplier == 'Cielo')
     
-    dub_pct = st.number_input("Dublin %", 0, 100, 0)
+    st.caption("LOCATION SPLIT (%)")
+    
+    # We use 'disabled=is_blended' to grey out the boxes if Cielo is picked
+    lon_pct = st.number_input("London %", 0, 100, 50, disabled=is_blended)
+    war_pct = st.number_input("Warsaw %", 0, 100, 50, disabled=is_blended)
+    dub_pct = st.number_input("Dublin %", 0, 100, 0, disabled=is_blended)
     
     bir_pct = 0
     if curr_supplier == 'RSR': 
-        bir_pct = st.number_input("Birmingham %", 0, 100, 0)
+        bir_pct = st.number_input("Birmingham %", 0, 100, 0, disabled=is_blended)
     
     total_split = lon_pct + war_pct + dub_pct + bir_pct
     
     # ADD BUTTON LOGIC
-    if total_split != 100:
+    # If it is Blended, we IGNORE the 100% split rule
+    if not is_blended and total_split != 100:
         st.error(f"Total: {total_split}%")
         btn_disabled = True
     elif mode == "⚖️ Comparison" and not target_bucket:
@@ -259,20 +250,35 @@ with st.sidebar:
 
     if st.button(btn_text, disabled=btn_disabled, use_container_width=True):
         # 1. CALCULATE COST
-        vol_lon = total_demand * (lon_pct/100)
-        vol_war = total_demand * (war_pct/100)
-        vol_dub = total_demand * (dub_pct/100)
-        vol_bir = total_demand * (bir_pct/100)
-        
-        price_lon = get_price(curr_supplier, calc_tier, 'High Cost')
-        price_war = get_price(curr_supplier, calc_tier, 'Low Cost')
-        price_bir = get_price(curr_supplier, calc_tier, 'Medium/Low Cost')
-        
-        # Smart Dublin Logic
-        if curr_supplier == 'KF': price_dub = get_price(curr_supplier, calc_tier, 'High Cost')
-        else: price_dub = get_price(curr_supplier, calc_tier, 'Medium Cost')
+        if is_blended:
+            # --- CIELO LOGIC (Simple Multiplication) ---
+            # We set location volumes to 0 for the breakdown table
+            vol_lon = 0
+            vol_war = 0
+            vol_dub = 0
+            vol_bir = 0
+            
+            # Use the new 'Blended' cost type
+            blended_price = get_price(curr_supplier, calc_tier, 'Blended')
+            total_cost = total_demand * blended_price
+            
+        else:
+            # --- STANDARD LOGIC (Location Split) ---
+            vol_lon = total_demand * (lon_pct/100)
+            vol_war = total_demand * (war_pct/100)
+            vol_dub = total_demand * (dub_pct/100)
+            vol_bir = total_demand * (bir_pct/100)
+            
+            price_lon = get_price(curr_supplier, calc_tier, 'High Cost')
+            price_war = get_price(curr_supplier, calc_tier, 'Low Cost')
+            price_bir = get_price(curr_supplier, calc_tier, 'Medium/Low Cost')
+            
+            # Smart Dublin Logic
+            if curr_supplier == 'KF': price_dub = get_price(curr_supplier, calc_tier, 'High Cost')
+            else: price_dub = get_price(curr_supplier, calc_tier, 'Medium Cost')
 
-        total_cost = (vol_lon * price_lon) + (vol_war * price_war) + (vol_dub * price_dub) + (vol_bir * price_bir)
+            total_cost = (vol_lon * price_lon) + (vol_war * price_war) + (vol_dub * price_dub) + (vol_bir * price_bir)
+            
         recruiters_needed = total_demand / calc_ppr
         
         wf_display_name = wf_name_backend
