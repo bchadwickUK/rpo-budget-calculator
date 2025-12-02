@@ -345,10 +345,41 @@ if mode == "📝 Budget Builder":
             use_container_width=True
         )
         
-        # Delete Button
-        if st.button("🗑️ Clear Budget"):
-            st.session_state.budget_lines = []
-            st.rerun()
+        # --- NEW MANAGEMENT SECTION ---
+        st.divider()
+        st.write("### 🛠️ Manage Data")
+        
+        c_m1, c_m2, c_m3 = st.columns(3)
+        
+        with c_m1:
+            # CSV Download
+            csv = df_results.to_csv(index=False).encode('utf-8')
+            st.download_button(
+                label="📥 Download CSV",
+                data=csv,
+                file_name="rpo_budget_draft.csv",
+                mime="text/csv",
+                use_container_width=True
+            )
+            
+        with c_m2:
+            # Row Deletion
+            # Create friendly labels: "1. SWE - RSR (50 roles)"
+            del_options = [f"{i+1}. {row['Workflow']} ({row['Demand']})" for i, row in enumerate(st.session_state.budget_lines)]
+            selected_del = st.selectbox("Select line to remove", del_options, label_visibility="collapsed")
+            
+            if st.button("🗑️ Remove Line", use_container_width=True):
+                if selected_del:
+                    # Extract index from string "1. ..." -> 0
+                    idx_to_del = int(selected_del.split(".")[0]) - 1
+                    st.session_state.budget_lines.pop(idx_to_del)
+                    st.rerun()
+
+        with c_m3:
+             if st.button("💥 Clear All", type="primary", use_container_width=True):
+                st.session_state.budget_lines = []
+                st.rerun()
+
     else:
         st.info("👈 Select inputs in the sidebar and click **'Add to Budget'**.")
 
@@ -432,3 +463,4 @@ elif mode == "⚖️ Comparison":
              st.info("Scenarios created, but they are empty. Add items using the sidebar.")
     else:
         st.info("👈 Select **'+ Create New Scenario'** in the sidebar to start.")
+    
