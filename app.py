@@ -149,7 +149,6 @@ with st.sidebar:
     st.image("https://upload.wikimedia.org/wikipedia/commons/thumb/c/c1/Google_%22G%22_logo.svg/480px-Google_%22G%22_logo.svg.png", width=40)
     
     # --- TOP LEVEL NAVIGATION ---
-    # This determines the entire state of the app
     mode = st.radio(
         "Select Mode:",
         ["📝 Budget Builder", "⚖️ Comparison"],
@@ -197,6 +196,10 @@ with st.sidebar:
         (df_workflows['Role'] == selected_role) & 
         (df_workflows['Supplier'] == selected_supplier)
     ].iloc[0]
+
+    # --- NEW: SENSE CHECK ---
+    # Shows the Tier and PPR for the selected combination
+    st.caption(f"Tier: {wf_details['Pricing Tier']} | PPR: {wf_details['Avg PPR']}")
     
     curr_supplier = wf_details['Supplier']
     wf_name_backend = wf_details['Workflow Name']
@@ -212,7 +215,7 @@ with st.sidebar:
             calc_ppr = wf_details['Avg PPR']
             calc_tier = wf_details['Pricing Tier']
 
-# Volume & Locations
+    # Volume & Locations
     total_demand = st.number_input("Demand Volume", min_value=1, value=50)
     
     # Check if Cielo (Blended) is selected
