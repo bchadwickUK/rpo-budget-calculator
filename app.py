@@ -145,64 +145,35 @@ def get_price(supplier, tier, cost_type):
     if not row.empty: return row.iloc[0]['Price']
     return 0
 
-# --- SIDEBAR ---
-with st.sidebar:
-    st.image("https://upload.wikimedia.org/wikipedia/commons/thumb/c/c1/Google_%22G%22_logo.svg/480px-Google_%22G%22_logo.svg.png", width=40)
-    
-    # --- TOP LEVEL NAVIGATION ---
-    mode = st.radio(
-        "Select Mode:",
-        ["📝 Budget Builder", "⚡ Quick Compare"],
-        index=0,
-        label_visibility="collapsed"
-    )
-    
+# --- INPUT GROUP 2: VOLUME & LOCATION ---
     st.divider()
-
-    # --- INPUT FORM ---
-    st.write("### ⚙️ Configure Workflow")
     
-    unique_roles = df_workflows['Role'].unique()
-    selected_role = st.selectbox("1. Role", unique_roles)
-    
-    available_suppliers = df_workflows[df_workflows['Role'] == selected_role]['Supplier'].unique()
-    selected_supplier = st.selectbox("2. Supplier", available_suppliers)
-    
-    wf_details = df_workflows[
-        (df_workflows['Role'] == selected_role) & 
-        (df_workflows['Supplier'] == selected_supplier)
-    ].iloc[0]
-
-    st.caption(f"Tier: {wf_details['Pricing Tier']} | PPR: {wf_details['Avg PPR']}")
-    
-    curr_supplier = wf_details['Supplier']
-    wf_name_backend = wf_details['Workflow Name']
-
-    # Efficiency Settings
-    with st.expander("🛠️ Efficiency / PPR"):
-        efficiency_mode = st.checkbox("Override Defaults", value=False)
-        if efficiency_mode:
-            st.info(f"Modifying {curr_supplier}")
-            calc_ppr = st.number_input("Target PPR:", value=float(wf_details['Avg PPR']), step=0.5)
-            calc_tier = st.selectbox("New Tier:", ['T1','T2','T3','T4','T5','T6','T7'], index=['T1','T2','T3','T4','T5','T6','T7'].index(wf_details['Pricing Tier']))
-        else:
-            calc_ppr = wf_details['Avg PPR']
-            calc_tier = wf_details['Pricing Tier']
-
-    # Volume & Locations
+    # 1. Volume Input (Full Width)
     total_demand = st.number_input("Demand Volume", min_value=1, value=50)
     
+    # 2. Location Split (Grid Layout)
+    st.write("📍 **Location Split (%)**")
+    
+    # Check for blended
     is_blended = (curr_supplier == 'Cielo')
     
-    st.caption("LOCATION SPLIT (%)")
+    # Create 2 Columns for compact view
+    c_loc1, c_loc2 = st.columns(2)
     
-    lon_pct = st.number_input("London %", 0, 100, 50, disabled=is_blended)
-    war_pct = st.number_input("Warsaw %", 0, 100, 50, disabled=is_blended)
-    dub_pct = st.number_input("Dublin %", 0, 100, 0, disabled=is_blended)
-    
-    bir_pct = 0
-    if curr_supplier == 'RSR': 
-        bir_pct = st.number_input("Birmingham %", 0, 100, 0, disabled=is_blended)
+    with c_loc1:
+        lon_pct = st.number_input("London %", 0, 100, 50, disabled=is_blended)
+        dub_pct = st.number_input("Dublin %", 0, 100, 0, disabled=is_blended)
+        
+    with c_loc2:
+        war_pct = st.number_input("Warsaw %", 0, 100, 50, disabled=is_blended)
+        
+        # Birmingham is conditional, but we keep the slot in the grid to maintain alignment
+        if curr_supplier == 'RSR': 
+            bir_pct = st.number_input("Birmingham %", 0, 100, 0, disabled=is_blended)
+        else:
+            bir_pct = 0
+            # Optional: Add empty space to keep grid aligned if you want, 
+            # but usually leaving it empty is cleaner.
     
     total_split = lon_pct + war_pct + dub_pct + bir_pct
     
@@ -210,7 +181,13 @@ with st.sidebar:
     custom_label = ""
     if mode == "⚡ Quick Compare":
         st.write("") # Spacer
-        custom_label = st.text_input("Name this Option (Optional):", placeholder="e.g. Aggressive Warsaw Split")
+        custom_label = st.text_input("🏷️ Option Name (Optional):", placeholder="e.g. Aggressive Warsaw Split")
+    
+    # Validation Logic
+    btn_disabled = False
+    if not is_blended and total_split != 100:
+        st.error(f"⚠️ Total Split: {total_split}% (Must be 100%)")
+        btn_disabled = True
     
     # Validation Logic
     btn_disabled = False
