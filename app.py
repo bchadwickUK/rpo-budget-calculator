@@ -65,7 +65,7 @@ if not st.session_state.logged_in:
 if 'budget_lines' not in st.session_state:
     st.session_state.budget_lines = []
 
-# NEW: A/B Scenarios
+# A/B Scenarios
 if 'scenario_a' not in st.session_state:
     st.session_state.scenario_a = []
 if 'scenario_b' not in st.session_state:
