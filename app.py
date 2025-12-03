@@ -406,12 +406,15 @@ elif mode == "⚡ Quick Compare":
     
     # 3. Combined Chart
     if not df_a.empty or not df_b.empty:
-        # Create a simple summary DF for the chart
-        chart_data = pd.DataFrame({
-            'Scenario': ['A', 'B'],
-            'Total Cost ($)': [cost_a, cost_b]
-        })
-        st.bar_chart(chart_data, x='Scenario', y='Total Cost ($)', color=["#4285F4", "#DB4437"]) # Blue vs Red
+        # FIX: We structure this as "Wide" data (2 columns) so Streamlit accepts the 2 colors
+        chart_data = pd.DataFrame(
+            [[cost_a, cost_b]], 
+            columns=["Scenario A", "Scenario B"],
+            index=["Total Spend"]
+        )
+        
+        # We remove the x/y parameters and let the columns dictate the split
+        st.bar_chart(chart_data, color=["#4285F4", "#DB4437"]) # Blue for A, Red for B
 
     # 4. Data Table & Clipboard
     st.divider()
