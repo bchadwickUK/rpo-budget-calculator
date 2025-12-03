@@ -64,8 +64,12 @@ if not st.session_state.logged_in:
 # --- DATA SETUP ---
 if 'budget_lines' not in st.session_state:
     st.session_state.budget_lines = []
-if 'comparison_lines' not in st.session_state:
-    st.session_state.comparison_lines = []
+
+# NEW: A/B Scenarios
+if 'scenario_a' not in st.session_state:
+    st.session_state.scenario_a = []
+if 'scenario_b' not in st.session_state:
+    st.session_state.scenario_b = []
 
 # 1. WORKFLOW DATA
 workflow_data = {
@@ -159,6 +163,17 @@ with st.sidebar:
     
     st.divider()
 
+    # --- A/B TOGGLE (Comparison Mode Only) ---
+    active_scenario = "Budget" # Default for Builder
+    if mode == "⚡ Quick Compare":
+        st.write("### 🔀 Comparison Toggle")
+        active_scenario = st.radio(
+            "Add lines to:",
+            ["Scenario A (Baseline)", "Scenario B (Proposed)"],
+            label_visibility="collapsed"
+        )
+        st.divider()
+
     # --- INPUT FORM ---
     st.write("### ⚙️ Configure Workflow")
     
@@ -210,22 +225,17 @@ with st.sidebar:
         
     with c_loc2:
         war_pct = st.number_input("Warsaw %", 0, 100, 50, disabled=is_blended)
-        
-        # Birmingham is conditional, but we keep the slot in the grid to maintain alignment
         if curr_supplier == 'RSR': 
             bir_pct = st.number_input("Birmingham %", 0, 100, 0, disabled=is_blended)
         else:
             bir_pct = 0
-            # Optional: Add empty space to keep grid aligned if you want, 
-            # but usually leaving it empty is cleaner.
     
     total_split = lon_pct + war_pct + dub_pct + bir_pct
     
-    # --- NEW: OPTIONAL LABEL (Quick Compare Only) ---
+    # --- NEW: OPTIONAL LABEL ---
     custom_label = ""
-    if mode == "⚡ Quick Compare":
-        st.write("") # Spacer
-        custom_label = st.text_input("🏷️ Option Name (Optional):", placeholder="e.g. Aggressive Warsaw Split")
+    # We remove the custom label input here because A/B scenarios usually use the standard name
+    # But if you want it back, we can add it. For now, we stick to clean Role names.
     
     # Validation Logic
     btn_disabled = False
@@ -235,11 +245,17 @@ with st.sidebar:
 
     # Button Logic
     if mode == "⚡ Quick Compare":
-        btn_text = "Add to Comparison"
+        if "Scenario A" in active_scenario:
+            btn_text = "Add to Scenario A"
+            btn_color = "primary" # Normal blue
+        else:
+            btn_text = "Add to Scenario B"
+            btn_color = "secondary" # Grey/White to differentiate
     else:
         btn_text = "Add to Budget"
+        btn_color = "primary"
 
-    if st.button(btn_text, disabled=btn_disabled, use_container_width=True):
+    if st.button(btn_text, disabled=btn_disabled, type="primary" if btn_color=="primary" else "secondary", use_container_width=True):
         # 1. CALCULATE COST
         if is_blended:
             vol_lon = 0
@@ -278,17 +294,18 @@ with st.sidebar:
             "Lon OA": vol_lon,
             "War OA": vol_war,
             "Dub OA": vol_dub,
-            "Bir OA": vol_bir,
-            "Custom Label": custom_label # Save the label
+            "Bir OA": vol_bir
         }
 
         if mode == "📝 Budget Builder":
             st.session_state.budget_lines.append(new_line)
             st.toast("Added to Budget!")
+        elif "Scenario A" in active_scenario:
+            st.session_state.scenario_a.append(new_line)
+            st.toast("Added to Scenario A!")
         else:
-            # Comparison Mode - Add to quick list
-            st.session_state.comparison_lines.append(new_line)
-            st.toast(f"Added to Comparison!")
+            st.session_state.scenario_b.append(new_line)
+            st.toast("Added to Scenario B!")
 
 # --- MAIN PAGE LOGIC ---
 st.title("RPO Architect")
@@ -363,96 +380,76 @@ if mode == "📝 Budget Builder":
     else:
         st.info("👈 Select inputs in the sidebar and click **'Add to Budget'**.")
 
-# --- MODE 2: QUICK COMPARE VIEW ---
+# --- MODE 2: A/B COMPARE VIEW ---
 elif mode == "⚡ Quick Compare":
-    st.subheader("⚡ Quick Comparison Sandbox")
+    st.subheader("⚡ A/B Scenario Comparison")
     
-    if len(st.session_state.comparison_lines) > 0:
-        # Prepare Data - Treat each line as a scenario
-        comp_data = []
+    # 1. Calc Totals
+    cost_a, cost_b = 0, 0
+    df_a = pd.DataFrame()
+    df_b = pd.DataFrame()
+    
+    if st.session_state.scenario_a:
+        df_a = pd.DataFrame(st.session_state.scenario_a)
+        cost_a = (df_a['Total Cost (€)'].sum()) * usd_rate
+        df_a['Scenario'] = 'A'
         
-        # We assign a temporary ID "Option X" to each line to graph them side-by-side
-        for i, line in enumerate(st.session_state.comparison_lines):
-            cost_usd = line['Total Cost (€)'] * usd_rate
-            cpoa = cost_usd / line['Demand'] if line['Demand'] > 0 else 0
-            
-            # CHECK FOR CUSTOM LABEL
-            if line.get("Custom Label"):
-                 # Use the user's label
-                 label = line["Custom Label"]
-            else:
-                 # Default fallback
-                 label = f"Option {i+1}: {line['Supplier']} ({line['Demand']} roles)"
-            
-            comp_data.append({
-                'Label': label,
-                'Workflow': line['Workflow'],
-                'Cost ($)': cost_usd,
-                'Recruiters': line['Recruiters'],
-                'CPOA ($)': cpoa
-            })
-        
-        df_comp = pd.DataFrame(comp_data)
-        
-        # 1. Executive Insight (Compare Best vs Worst)
-        if len(df_comp) >= 2:
-            # Sort by Cost
-            sorted_df = df_comp.sort_values(by='Cost ($)')
-            best = sorted_df.iloc[0]
-            worst = sorted_df.iloc[-1]
-            diff = worst['Cost ($)'] - best['Cost ($)']
-            
-            st.write(f"### 🔎 Insight")
-            st.success(f"**{best['Label']}** is the most cost-effective option.")
-            st.info(f"Saving **${diff:,.0f}** compared to **{worst['Label']}**.")
+    if st.session_state.scenario_b:
+        df_b = pd.DataFrame(st.session_state.scenario_b)
+        cost_b = (df_b['Total Cost (€)'].sum()) * usd_rate
+        df_b['Scenario'] = 'B'
+    
+    # 2. Executive Scoreboard
+    col1, col2, col3 = st.columns(3)
+    col1.metric("Scenario A (Baseline)", f"${cost_a:,.0f}")
+    col2.metric("Scenario B (Proposed)", f"${cost_b:,.0f}", delta=f"${cost_b - cost_a:,.0f}", delta_color="inverse")
+    
+    # 3. Combined Chart
+    if not df_a.empty or not df_b.empty:
+        # Create a simple summary DF for the chart
+        chart_data = pd.DataFrame({
+            'Scenario': ['A', 'B'],
+            'Total Cost ($)': [cost_a, cost_b]
+        })
+        st.bar_chart(chart_data, x='Scenario', y='Total Cost ($)', color=["#4285F4", "#DB4437"]) # Blue vs Red
 
-        # 2. Charts (Headcount chart removed)
-        st.caption("Total Spend (USD)")
-        st.bar_chart(df_comp, x='Label', y='Cost ($)', color="#4285F4")
-
-        # 3. Table
-        st.divider()
-        st.write("### Data Breakdown")
-        df_comp['Cost ($)'] = df_comp['Cost ($)'].apply(lambda x: f"${x:,.0f}")
-        df_comp['CPOA ($)'] = df_comp['CPOA ($)'].apply(lambda x: f"${x:,.0f}")
-        df_comp['Recruiters'] = df_comp['Recruiters'].apply(lambda x: f"{x:.1f}")
+    # 4. Data Table & Clipboard
+    st.divider()
+    st.write("### 📋 Breakdown & Export")
+    
+    # Combine dataframes
+    if not df_a.empty or not df_b.empty:
+        df_combined = pd.concat([df_a, df_b], ignore_index=True)
         
-        st.dataframe(df_comp[['Label', 'Workflow', 'Cost ($)', 'CPOA ($)', 'Recruiters']], use_container_width=True)
-
-        # --- NEW: MANAGE COMPARISON SECTION ---
-        st.divider()
-        st.write("### 🛠️ Manage Comparison")
+        # Polish for display
+        df_display = df_combined.copy()
+        df_display['Total Cost ($)'] = (df_display['Total Cost (€)'] * usd_rate)
         
-        c_del1, c_del2 = st.columns(2)
+        # Reorder columns for clean copy
+        cols = ['Scenario', 'Workflow', 'Supplier', 'Demand', 'Total Cost ($)', 'Recruiters', 'Lon OA', 'War OA', 'Dub OA', 'Bir OA']
+        df_export = df_display[cols]
         
-        with c_del1:
-            # Dropdown to select line
-            # We use the index to create a unique label for deletion
-            
-            # Helper to get display name for dropdown
-            def get_del_label(i, line):
-                if line.get("Custom Label"):
-                    return f"{line['Custom Label']} ({line['Supplier']})"
-                else:
-                    return f"Option {i+1}: {line['Supplier']} - {line['Workflow']}"
-
-            comp_options = [get_del_label(i, line) for i, line in enumerate(st.session_state.comparison_lines)]
-            
-            selected_comp_del = st.selectbox("Select option to remove", comp_options, label_visibility="collapsed")
-            
-            if st.button("🗑️ Remove Selected Option", use_container_width=True):
-                if selected_comp_del:
-                    # Find index by matching the string (simple method)
-                    idx_to_del = comp_options.index(selected_comp_del)
-                    st.session_state.comparison_lines.pop(idx_to_del)
-                    st.rerun()
-                    
-        with c_del2:
-            st.write("") # Spacer for alignment
-            st.write("")
-            if st.button("💥 Clear All Comparison", type="primary", use_container_width=True):
-                st.session_state.comparison_lines = []
-                st.rerun()
-
+        # Display as a clean dataframe
+        st.dataframe(df_export.style.format({'Total Cost ($)': "${:,.0f}"}), use_container_width=True)
+        
+        st.write("#### ✂️ Copy to Google Sheets")
+        st.caption("Click inside, Press Ctrl+A, then Ctrl+C. Paste into cell A1 of your Sheet.")
+        
+        # Create TSV string for easy pasting
+        tsv = df_export.to_csv(sep='\t', index=False)
+        st.text_area("Clipboard Data", tsv, height=150)
+        
     else:
-        st.info("👈 Add multiple options (e.g., RSR vs Cielo) in the sidebar to compare them side-by-side.")
+        st.info("👈 Use the toggle in the sidebar to add items to Scenario A or B.")
+
+    # 5. Clear Buttons
+    st.divider()
+    c_clear1, c_clear2 = st.columns(2)
+    with c_clear1:
+        if st.button("🗑️ Clear Scenario A"):
+            st.session_state.scenario_a = []
+            st.rerun()
+    with c_clear2:
+        if st.button("🗑️ Clear Scenario B"):
+            st.session_state.scenario_b = []
+            st.rerun()
