@@ -379,7 +379,7 @@ elif mode == "⚡ Quick Compare":
             st.success(f"**{best['Label']}** is the most cost-effective option.")
             st.info(f"Saving **${diff:,.0f}** compared to **{worst['Label']}**.")
 
-        # 2. Charts (Removed Headcount Chart)
+        # 2. Charts (Headcount chart removed)
         st.caption("Total Spend (USD)")
         st.bar_chart(df_comp, x='Label', y='Cost ($)', color="#4285F4")
 
@@ -392,10 +392,31 @@ elif mode == "⚡ Quick Compare":
         
         st.dataframe(df_comp[['Label', 'Workflow', 'Cost ($)', 'CPOA ($)', 'Recruiters']], use_container_width=True)
 
-        # Clear Button
-        if st.button("🗑️ Clear Comparison"):
-            st.session_state.comparison_lines = []
-            st.rerun()
+        # --- NEW: MANAGE COMPARISON SECTION ---
+        st.divider()
+        st.write("### 🛠️ Manage Comparison")
+        
+        c_del1, c_del2 = st.columns(2)
+        
+        with c_del1:
+            # Dropdown to select line
+            # We use the index to create a unique label for deletion
+            comp_options = [f"Option {i+1}: {line['Supplier']} - {line['Workflow']} ({line['Demand']})" for i, line in enumerate(st.session_state.comparison_lines)]
+            selected_comp_del = st.selectbox("Select option to remove", comp_options, label_visibility="collapsed")
+            
+            if st.button("🗑️ Remove Selected Option", use_container_width=True):
+                if selected_comp_del:
+                    # Extract index from string "Option 1: ..." -> index 0
+                    idx_to_del = int(selected_comp_del.split(":")[0].replace("Option ", "")) - 1
+                    st.session_state.comparison_lines.pop(idx_to_del)
+                    st.rerun()
+                    
+        with c_del2:
+            st.write("") # Spacer for alignment
+            st.write("")
+            if st.button("💥 Clear All Comparison", type="primary", use_container_width=True):
+                st.session_state.comparison_lines = []
+                st.rerun()
 
     else:
         st.info("👈 Add multiple options (e.g., RSR vs Cielo) in the sidebar to compare them side-by-side.")
