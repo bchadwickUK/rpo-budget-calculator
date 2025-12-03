@@ -64,7 +64,6 @@ if not st.session_state.logged_in:
 # --- DATA SETUP ---
 if 'budget_lines' not in st.session_state:
     st.session_state.budget_lines = []
-# NEW: We replace the complex 'scenarios' dict with a simple list for quick comparison
 if 'comparison_lines' not in st.session_state:
     st.session_state.comparison_lines = []
 
@@ -380,14 +379,9 @@ elif mode == "⚡ Quick Compare":
             st.success(f"**{best['Label']}** is the most cost-effective option.")
             st.info(f"Saving **${diff:,.0f}** compared to **{worst['Label']}**.")
 
-        # 2. Charts
-        c_chart1, c_chart2 = st.columns(2)
-        with c_chart1:
-            st.caption("Total Spend (USD)")
-            st.bar_chart(df_comp, x='Label', y='Cost ($)', color="#4285F4")
-        with c_chart2:
-            st.caption("Headcount Required")
-            st.bar_chart(df_comp, x='Label', y='Recruiters', color="#DB4437")
+        # 2. Charts (Removed Headcount Chart)
+        st.caption("Total Spend (USD)")
+        st.bar_chart(df_comp, x='Label', y='Cost ($)', color="#4285F4")
 
         # 3. Table
         st.divider()
