@@ -206,6 +206,12 @@ with st.sidebar:
     
     total_split = lon_pct + war_pct + dub_pct + bir_pct
     
+    # --- NEW: OPTIONAL LABEL (Quick Compare Only) ---
+    custom_label = ""
+    if mode == "⚡ Quick Compare":
+        st.write("") # Spacer
+        custom_label = st.text_input("Name this Option (Optional):", placeholder="e.g. Aggressive Warsaw Split")
+    
     # Validation Logic
     btn_disabled = False
     if not is_blended and total_split != 100:
@@ -257,7 +263,8 @@ with st.sidebar:
             "Lon OA": vol_lon,
             "War OA": vol_war,
             "Dub OA": vol_dub,
-            "Bir OA": vol_bir
+            "Bir OA": vol_bir,
+            "Custom Label": custom_label # Save the label
         }
 
         if mode == "📝 Budget Builder":
@@ -354,8 +361,13 @@ elif mode == "⚡ Quick Compare":
             cost_usd = line['Total Cost (€)'] * usd_rate
             cpoa = cost_usd / line['Demand'] if line['Demand'] > 0 else 0
             
-            # Create a label like "1. SWE - RSR (50)"
-            label = f"Option {i+1}: {line['Supplier']} ({line['Demand']} roles)"
+            # CHECK FOR CUSTOM LABEL
+            if line.get("Custom Label"):
+                 # Use the user's label
+                 label = line["Custom Label"]
+            else:
+                 # Default fallback
+                 label = f"Option {i+1}: {line['Supplier']} ({line['Demand']} roles)"
             
             comp_data.append({
                 'Label': label,
@@ -401,13 +413,22 @@ elif mode == "⚡ Quick Compare":
         with c_del1:
             # Dropdown to select line
             # We use the index to create a unique label for deletion
-            comp_options = [f"Option {i+1}: {line['Supplier']} - {line['Workflow']} ({line['Demand']})" for i, line in enumerate(st.session_state.comparison_lines)]
+            
+            # Helper to get display name for dropdown
+            def get_del_label(i, line):
+                if line.get("Custom Label"):
+                    return f"{line['Custom Label']} ({line['Supplier']})"
+                else:
+                    return f"Option {i+1}: {line['Supplier']} - {line['Workflow']}"
+
+            comp_options = [get_del_label(i, line) for i, line in enumerate(st.session_state.comparison_lines)]
+            
             selected_comp_del = st.selectbox("Select option to remove", comp_options, label_visibility="collapsed")
             
             if st.button("🗑️ Remove Selected Option", use_container_width=True):
                 if selected_comp_del:
-                    # Extract index from string "Option 1: ..." -> index 0
-                    idx_to_del = int(selected_comp_del.split(":")[0].replace("Option ", "")) - 1
+                    # Find index by matching the string (simple method)
+                    idx_to_del = comp_options.index(selected_comp_del)
                     st.session_state.comparison_lines.pop(idx_to_del)
                     st.rerun()
                     
