@@ -89,13 +89,13 @@ df_workflows['Workflow Name'] = df_workflows['Role'] + " - " + df_workflows['Sup
 # 2. PRICING DATA
 pricing_data = [
     # --- CIELO (BLENDED RATES) ---
-    {'Supplier': 'Cielo', 'Tier': 'T1', 'Cost_Type': 'Blended', 'Price': 1923},
-    {'Supplier': 'Cielo', 'Tier': 'T2', 'Cost_Type': 'Blended', 'Price': 2207},
-    {'Supplier': 'Cielo', 'Tier': 'T3', 'Cost_Type': 'Blended', 'Price': 2824},
-    {'Supplier': 'Cielo', 'Tier': 'T4', 'Cost_Type': 'Blended', 'Price': 3384},
-    {'Supplier': 'Cielo', 'Tier': 'T5', 'Cost_Type': 'Blended', 'Price': 3809},
-    {'Supplier': 'Cielo', 'Tier': 'T6', 'Cost_Type': 'Blended', 'Price': 4817},
-    {'Supplier': 'Cielo', 'Tier': 'T7', 'Cost_Type': 'Blended', 'Price': 6109},
+    {'Supplier': 'Cielo', 'Tier': 'T1', 'Cost_Type': 'Blended', 'Price': 1940},
+    {'Supplier': 'Cielo', 'Tier': 'T2', 'Cost_Type': 'Blended', 'Price': 2224},
+    {'Supplier': 'Cielo', 'Tier': 'T3', 'Cost_Type': 'Blended', 'Price': 2841},
+    {'Supplier': 'Cielo', 'Tier': 'T4', 'Cost_Type': 'Blended', 'Price': 3401},
+    {'Supplier': 'Cielo', 'Tier': 'T5', 'Cost_Type': 'Blended', 'Price': 3841},
+    {'Supplier': 'Cielo', 'Tier': 'T6', 'Cost_Type': 'Blended', 'Price': 4849},
+    {'Supplier': 'Cielo', 'Tier': 'T7', 'Cost_Type': 'Blended', 'Price': 6141},
 
     # --- KEEP RSR AND KF BELOW ---
     {'Supplier': 'RSR', 'Tier': 'T1', 'Cost_Type': 'High Cost', 'Price': 3359},
