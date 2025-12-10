@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import altair as alt
 
 # --- PAGE CONFIGURATION ---
 st.set_page_config(
@@ -356,7 +357,6 @@ if mode == "📝 Budget Builder":
         c3.metric("Avg CPOA", f"${avg_cpoa:,.0f}")
         
         # ROW 2: QUARTERLY BREAKDOWN (CONDITIONAL)
-        # Only show if there is actually quarterly data
         if (q1_tot + q2_tot + q3_tot + q4_tot) > 0:
             cq1, cq2, cq3, cq4 = st.columns(4)
             cq1.metric("Q1 (USD)", f"${q1_tot:,.0f}")
@@ -403,7 +403,6 @@ if mode == "📝 Budget Builder":
                 for q_name, q_vol, q_cost in quarters:
                     # Show all quarters if Demand exists
                     if row['Demand'] > 0:
-                        # Calculate Loc Splits for this quarter
                         l_o = q_vol * (row['Lon %'] / 100)
                         w_o = q_vol * (row['War %'] / 100)
                         d_o = q_vol * (row['Dub %'] / 100)
@@ -490,20 +489,56 @@ elif mode == "⚡ Quick Compare":
     col1, col2, col3 = st.columns(3)
     col1.metric(name_a, f"${cost_a:,.0f}")
     
-    # FIX: Ensure minus sign is at front for correct color logic
+    # Delta Logic (Corrected Green/Red arrow)
     val_delta = cost_b - cost_a
     fmt_delta = f"-${abs(val_delta):,.0f}" if val_delta < 0 else f"${val_delta:,.0f}"
-    
     col2.metric(name_b, f"${cost_b:,.0f}", delta=fmt_delta, delta_color="inverse")
     
-    # 3. Combined Chart
+    # --- NATURAL LANGUAGE SUMMARY (NEW) ---
+    if cost_a > 0 and cost_b > 0:
+        pct_change = ((cost_b - cost_a) / cost_a) * 100
+        if val_delta < 0:
+            st.success(f"✅ **Savings Opportunity:** By adopting {name_b}, you would save **${abs(val_delta):,.0f}** ({pct_change:.1f}%) annually vs. the baseline.")
+        elif val_delta > 0:
+            st.error(f"📈 **Investment Required:** {name_b} requires an additional investment of **${val_delta:,.0f}** (+{pct_change:.1f}%) annually vs. the baseline.")
+        else:
+            st.info("⚖️ **Neutral Impact:** Both scenarios have the exact same annual cost.")
+
+    # 3. Stacked Chart (Visual Upgrade)
+    st.divider()
     if not df_a.empty or not df_b.empty:
-        chart_data = pd.DataFrame(
-            [[cost_a, cost_b]], 
-            columns=[name_a, name_b],
-            index=["Total Spend"]
+        # Prepare Data for Stacked Chart
+        # We need a single DF with: Scenario, Supplier, Cost_USD
+        
+        # Add Scenario Label to DataFrames
+        if not df_a.empty: df_a['Scenario'] = name_a
+        if not df_b.empty: df_b['Scenario'] = name_b
+        
+        # Combine
+        df_chart = pd.concat([df_a, df_b], ignore_index=True)
+        
+        # Convert to USD for Charting
+        df_chart['Cost USD'] = df_chart['Total Cost (€)'] * usd_rate
+        
+        # Group by Scenario and Supplier to handle multiple lines of same supplier
+        df_chart_grouped = df_chart.groupby(['Scenario', 'Supplier'])['Cost USD'].sum().reset_index()
+
+        # Create Stacked Bar Chart
+        chart = (
+            alt.Chart(df_chart_grouped)
+            .mark_bar()
+            .encode(
+                x=alt.X('Scenario', axis=None),
+                y=alt.Y('Cost USD', axis=alt.Axis(format='$,.0f', title='Total Spend')),
+                color=alt.Color('Supplier', scale=alt.Scale(scheme='tableau10')),
+                tooltip=['Scenario', 'Supplier', alt.Tooltip('Cost USD', format='$,.0f')]
+            )
+            .properties(height=400)
+            .configure_axis(grid=False)
+            .configure_view(strokeWidth=0)
         )
-        st.bar_chart(chart_data, color=["#4285F4", "#DB4437"]) 
+        
+        st.altair_chart(chart, use_container_width=True)
 
     # 4. Data Table & Clipboard
     st.divider()
