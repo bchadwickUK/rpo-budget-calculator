@@ -33,7 +33,7 @@ st.markdown("""
 
     /* Metric Cards */
     [data-testid="stMetricValue"] {
-        font-size: 2rem !important;
+        font-size: 1.8rem !important;
         font-weight: 400;
     }
     
@@ -337,15 +337,30 @@ if mode == "📝 Budget Builder":
     if len(st.session_state.budget_lines) > 0:
         df_results = pd.DataFrame(st.session_state.budget_lines)
         
+        # AGGREGATE TOTALS
         total_eur = df_results['Total Cost (€)'].sum()
         total_usd = total_eur * usd_rate
         total_vol = df_results['Demand'].sum()
         avg_cpoa = total_usd / total_vol if total_vol > 0 else 0
         
+        # QUARTERLY TOTALS (Calculated from lines that used phasing)
+        q1_tot = df_results['Q1 Cost'].sum() * usd_rate
+        q2_tot = df_results['Q2 Cost'].sum() * usd_rate
+        q3_tot = df_results['Q3 Cost'].sum() * usd_rate
+        q4_tot = df_results['Q4 Cost'].sum() * usd_rate
+        
+        # ROW 1: PRIMARY METRICS
         c1, c2, c3 = st.columns(3)
         c1.metric("Forecast (USD)", f"${total_usd:,.0f}")
         c2.metric("Forecast (EUR)", f"€{total_eur:,.0f}")
         c3.metric("Avg CPOA", f"${avg_cpoa:,.0f}")
+        
+        # ROW 2: QUARTERLY BREAKDOWN
+        cq1, cq2, cq3, cq4 = st.columns(4)
+        cq1.metric("Q1 (USD)", f"${q1_tot:,.0f}")
+        cq2.metric("Q2 (USD)", f"${q2_tot:,.0f}")
+        cq3.metric("Q3 (USD)", f"${q3_tot:,.0f}")
+        cq4.metric("Q4 (USD)", f"${q4_tot:,.0f}")
         
         st.divider()
         
@@ -384,17 +399,7 @@ if mode == "📝 Budget Builder":
                 ]
                 
                 for q_name, q_vol, q_cost in quarters:
-                    # Only show rows if there is volume or cost, or if annual demand was entered without phasing (show even split or 0?)
-                    # If quarterly wasn't used, q_vol is 0. We skip to keep it clean, or we can show Q1-Q4 as 0.
-                    # Let's show all 4 quarters if 'Total Demand' > 0 to be consistent.
-                    
-                    if q_vol == 0 and row['Demand'] > 0 and row['Q1 Vol'] == 0: 
-                         # Special case: Annual demand was used, not quarterly. 
-                         # We could show "N/A" or just one row. But user wants specific breakdown.
-                         # Let's Skip this logic for now and only show if Quarterly was used.
-                         pass
-                    
-                    if row['Q1 Vol'] > 0 or row['Q2 Vol'] > 0: # Check if quarterly inputs were actually used
+                    if row['Q1 Vol'] > 0 or row['Q2 Vol'] > 0 or row['Q3 Vol'] > 0 or row['Q4 Vol'] > 0:
                         # Calculate Loc Splits for this quarter
                         l_o = q_vol * (row['Lon %'] / 100)
                         w_o = q_vol * (row['War %'] / 100)
