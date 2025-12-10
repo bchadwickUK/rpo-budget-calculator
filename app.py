@@ -207,8 +207,23 @@ with st.sidebar:
     # --- INPUT GROUP 2: VOLUME & LOCATION ---
     st.divider()
     
-    # 1. Volume Input (Full Width)
-    total_demand = st.number_input("Demand Volume", min_value=1, value=50)
+    # 1. Volume Input (Conditional Layout)
+    st.write("📊 **Volume & Phasing**")
+    use_quarterly = st.checkbox("Enable Quarterly Phasing", value=False)
+
+    if use_quarterly:
+        cq1, cq2 = st.columns(2)
+        cq3, cq4 = st.columns(2)
+        with cq1: q1_vol = st.number_input("Q1", min_value=0, value=10)
+        with cq2: q2_vol = st.number_input("Q2", min_value=0, value=10)
+        with cq3: q3_vol = st.number_input("Q3", min_value=0, value=10)
+        with cq4: q4_vol = st.number_input("Q4", min_value=0, value=10)
+        total_demand = q1_vol + q2_vol + q3_vol + q4_vol
+        st.caption(f"**Total Annual Demand: {total_demand}**")
+    else:
+        total_demand = st.number_input("Annual Demand", min_value=1, value=50)
+        # Store 0 for breakdown if not used, to keep data clean
+        q1_vol, q2_vol, q3_vol, q4_vol = 0, 0, 0, 0
     
     # 2. Location Split (Grid Layout)
     st.write("📍 **Location Split (%)**")
@@ -231,9 +246,6 @@ with st.sidebar:
             bir_pct = 0
     
     total_split = lon_pct + war_pct + dub_pct + bir_pct
-    
-    # --- NEW: OPTIONAL LABEL ---
-    custom_label = ""
     
     # Validation Logic
     btn_disabled = False
@@ -282,6 +294,18 @@ with st.sidebar:
         wf_display_name = wf_name_backend
         if efficiency_mode: wf_display_name += f" (Eff: {calc_tier})"
 
+        # Calculate Quarterly Costs (Pro-rata based on volume or manual entry)
+        unit_price = total_cost / total_demand if total_demand > 0 else 0
+        
+        if use_quarterly:
+            c_q1 = q1_vol * unit_price
+            c_q2 = q2_vol * unit_price
+            c_q3 = q3_vol * unit_price
+            c_q4 = q4_vol * unit_price
+        else:
+            # Leave as 0 for non-phased lines
+            c_q1, c_q2, c_q3, c_q4 = 0, 0, 0, 0
+
         new_line = {
             "Workflow": wf_display_name,
             "Supplier": curr_supplier,
@@ -292,7 +316,10 @@ with st.sidebar:
             "Lon OA": vol_lon,
             "War OA": vol_war,
             "Dub OA": vol_dub,
-            "Bir OA": vol_bir
+            "Bir OA": vol_bir,
+            # QUARTERLY DATA
+            "Q1 Vol": q1_vol, "Q2 Vol": q2_vol, "Q3 Vol": q3_vol, "Q4 Vol": q4_vol,
+            "Q1 Cost": c_q1, "Q2 Cost": c_q2, "Q3 Cost": c_q3, "Q4 Cost": c_q4
         }
 
         if mode == "📝 Budget Builder":
@@ -330,7 +357,13 @@ if mode == "📝 Budget Builder":
         
         st.divider()
         
+        # --- VIEW TOGGLE ---
+        view_mode = st.radio("Table View:", ["Summary", "💸 Cash Flow (Quarterly)"], horizontal=True, label_visibility="collapsed")
+
+        # PREPARE DISPLAY DATA
         df_display = df_results.copy()
+        
+        # Standard Formatting
         df_display['CPOA ($)'] = (df_display['Total Cost (€)'] * usd_rate) / df_display['Demand']
         df_display['Total Cost ($)'] = (df_display['Total Cost (€)'] * usd_rate).apply(lambda x: f"${x:,.0f}")
         df_display['Total Cost (€)'] = df_display['Total Cost (€)'].apply(lambda x: f"€{x:,.0f}")
@@ -340,10 +373,36 @@ if mode == "📝 Budget Builder":
         for col in ["Lon OA", "War OA", "Dub OA", "Bir OA"]:
             df_display[col] = df_display[col].apply(lambda x: f"{x:.1f}")
 
-        st.dataframe(
-            df_display[["Workflow", "Supplier", "Demand", "Lon OA", "War OA", "Dub OA", "Bir OA", "CPOA ($)", "Total Cost ($)", "Recruiters"]], 
-            use_container_width=True
-        )
+        if view_mode == "Summary":
+            # EXISTING SUMMARY VIEW
+            st.dataframe(
+                df_display[["Workflow", "Supplier", "Demand", "Lon OA", "War OA", "Dub OA", "Bir OA", "CPOA ($)", "Total Cost ($)", "Recruiters"]], 
+                use_container_width=True
+            )
+        else:
+            # NEW CASH FLOW VIEW
+            df_cash = df_display.copy() # Use the already formatted location columns
+            
+            # Format Quarter Costs to USD
+            for q in ["Q1", "Q2", "Q3", "Q4"]:
+                col_name_usd = f"{q} ($)"
+                # Calculate USD value from raw results (not display) to avoid string issues
+                # We need to map back to original indices if we had sorted, but here order is preserved
+                raw_col_name = f"{q} Cost"
+                
+                # We calculate USD from the original raw DF
+                usd_vals = df_results[raw_col_name] * usd_rate
+                df_cash[col_name_usd] = usd_vals.apply(lambda x: f"${x:,.0f}" if x > 0 else "-")
+            
+            # Combine Operational (Location) + Financial (Quarterly)
+            cols_to_show = [
+                "Workflow", "Supplier", "Demand", 
+                "Lon OA", "War OA", "Dub OA", "Bir OA", # Operational
+                "Q1 ($)", "Q2 ($)", "Q3 ($)", "Q4 ($)", # Financial
+                "Total Cost ($)"
+            ]
+            
+            st.dataframe(df_cash[cols_to_show], use_container_width=True)
         
         st.divider()
         st.write("### 🛠️ Manage Data")
@@ -382,7 +441,7 @@ if mode == "📝 Budget Builder":
 elif mode == "⚡ Quick Compare":
     st.subheader("⚡ A/B Scenario Comparison")
     
-    # --- NEW: SCENARIO NAMING (At Top of Main Page) ---
+    # SCENARIO NAMING
     with st.expander("⚙️ Scenario Names", expanded=False):
         c_name1, c_name2 = st.columns(2)
         name_a = c_name1.text_input("Label for Scenario A", value="Scenario A (Baseline)")
@@ -396,12 +455,12 @@ elif mode == "⚡ Quick Compare":
     if st.session_state.scenario_a:
         df_a = pd.DataFrame(st.session_state.scenario_a)
         cost_a = (df_a['Total Cost (€)'].sum()) * usd_rate
-        df_a['Scenario'] = name_a # Use custom name
+        df_a['Scenario'] = name_a 
         
     if st.session_state.scenario_b:
         df_b = pd.DataFrame(st.session_state.scenario_b)
         cost_b = (df_b['Total Cost (€)'].sum()) * usd_rate
-        df_b['Scenario'] = name_b # Use custom name
+        df_b['Scenario'] = name_b 
     
     # 2. Executive Scoreboard
     col1, col2, col3 = st.columns(3)
@@ -410,39 +469,31 @@ elif mode == "⚡ Quick Compare":
     
     # 3. Combined Chart
     if not df_a.empty or not df_b.empty:
-        # FIX: We structure this as "Wide" data (2 columns) so Streamlit accepts the 2 colors
         chart_data = pd.DataFrame(
             [[cost_a, cost_b]], 
             columns=[name_a, name_b],
             index=["Total Spend"]
         )
-        
-        # We remove the x/y parameters and let the columns dictate the split
-        st.bar_chart(chart_data, color=["#4285F4", "#DB4437"]) # Blue for A, Red for B
+        st.bar_chart(chart_data, color=["#4285F4", "#DB4437"]) 
 
     # 4. Data Table & Clipboard
     st.divider()
     st.write("### 📋 Breakdown & Export")
     
-    # Combine dataframes
     if not df_a.empty or not df_b.empty:
         df_combined = pd.concat([df_a, df_b], ignore_index=True)
         
-        # Polish for display
         df_display = df_combined.copy()
         df_display['Total Cost ($)'] = (df_display['Total Cost (€)'] * usd_rate)
         
-        # Reorder columns for clean copy
         cols = ['Scenario', 'Workflow', 'Supplier', 'Demand', 'Total Cost ($)', 'Recruiters', 'Lon OA', 'War OA', 'Dub OA', 'Bir OA']
         df_export = df_display[cols]
         
-        # Display as a clean dataframe
         st.dataframe(df_export.style.format({'Total Cost ($)': "${:,.0f}"}), use_container_width=True)
         
         st.write("#### ✂️ Copy to Google Sheets")
         st.caption("Click inside, Press Ctrl+A, then Ctrl+C. Paste into cell A1 of your Sheet.")
         
-        # Create TSV string for easy pasting
         tsv = df_export.to_csv(sep='\t', index=False)
         st.text_area("Clipboard Data", tsv, height=150)
         
