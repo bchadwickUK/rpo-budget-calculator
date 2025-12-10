@@ -343,7 +343,7 @@ if mode == "📝 Budget Builder":
         total_vol = df_results['Demand'].sum()
         avg_cpoa = total_usd / total_vol if total_vol > 0 else 0
         
-        # QUARTERLY TOTALS (Calculated from lines that used phasing)
+        # QUARTERLY TOTALS
         q1_tot = df_results['Q1 Cost'].sum() * usd_rate
         q2_tot = df_results['Q2 Cost'].sum() * usd_rate
         q3_tot = df_results['Q3 Cost'].sum() * usd_rate
@@ -355,12 +355,14 @@ if mode == "📝 Budget Builder":
         c2.metric("Forecast (EUR)", f"€{total_eur:,.0f}")
         c3.metric("Avg CPOA", f"${avg_cpoa:,.0f}")
         
-        # ROW 2: QUARTERLY BREAKDOWN
-        cq1, cq2, cq3, cq4 = st.columns(4)
-        cq1.metric("Q1 (USD)", f"${q1_tot:,.0f}")
-        cq2.metric("Q2 (USD)", f"${q2_tot:,.0f}")
-        cq3.metric("Q3 (USD)", f"${q3_tot:,.0f}")
-        cq4.metric("Q4 (USD)", f"${q4_tot:,.0f}")
+        # ROW 2: QUARTERLY BREAKDOWN (CONDITIONAL)
+        # Only show if there is actually quarterly data
+        if (q1_tot + q2_tot + q3_tot + q4_tot) > 0:
+            cq1, cq2, cq3, cq4 = st.columns(4)
+            cq1.metric("Q1 (USD)", f"${q1_tot:,.0f}")
+            cq2.metric("Q2 (USD)", f"${q2_tot:,.0f}")
+            cq3.metric("Q3 (USD)", f"${q3_tot:,.0f}")
+            cq4.metric("Q4 (USD)", f"${q4_tot:,.0f}")
         
         st.divider()
         
@@ -399,7 +401,8 @@ if mode == "📝 Budget Builder":
                 ]
                 
                 for q_name, q_vol, q_cost in quarters:
-                    if row['Q1 Vol'] > 0 or row['Q2 Vol'] > 0 or row['Q3 Vol'] > 0 or row['Q4 Vol'] > 0:
+                    # Show all quarters if Demand exists
+                    if row['Demand'] > 0:
                         # Calculate Loc Splits for this quarter
                         l_o = q_vol * (row['Lon %'] / 100)
                         w_o = q_vol * (row['War %'] / 100)
