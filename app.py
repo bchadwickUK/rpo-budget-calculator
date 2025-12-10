@@ -489,7 +489,12 @@ elif mode == "⚡ Quick Compare":
     # 2. Executive Scoreboard
     col1, col2, col3 = st.columns(3)
     col1.metric(name_a, f"${cost_a:,.0f}")
-    col2.metric(name_b, f"${cost_b:,.0f}", delta=f"${cost_b - cost_a:,.0f}", delta_color="inverse")
+    
+    # FIX: Ensure minus sign is at front for correct color logic
+    val_delta = cost_b - cost_a
+    fmt_delta = f"-${abs(val_delta):,.0f}" if val_delta < 0 else f"${val_delta:,.0f}"
+    
+    col2.metric(name_b, f"${cost_b:,.0f}", delta=fmt_delta, delta_color="inverse")
     
     # 3. Combined Chart
     if not df_a.empty or not df_b.empty:
