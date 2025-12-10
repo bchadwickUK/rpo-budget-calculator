@@ -72,6 +72,7 @@ if 'scenario_b' not in st.session_state:
     st.session_state.scenario_b = []
 
 # 1. WORKFLOW DATA
+# FIX: Re-added 'Avg PPR' column so T&M logic can reference it
 workflow_data = {
     'Role': [
         'SWE', 'SWE', 'SWE',
@@ -80,7 +81,8 @@ workflow_data = {
         'GBOFx', 'GBOFx', 'GBOFx'
     ],
     'Supplier': ['RSR', 'KF', 'Cielo'] * 4,
-    'Pricing Tier': ['T6', 'T6', 'T6'] * 3 + ['T4', 'T4', 'T4']
+    'Pricing Tier': ['T6', 'T6', 'T6'] * 3 + ['T4', 'T4', 'T4'],
+    'Avg PPR': [6, 6, 6, 6.5, 6.5, 6.5, 6, 6, 6, 9, 9, 9] 
 }
 df_workflows = pd.DataFrame(workflow_data)
 df_workflows['Workflow Name'] = df_workflows['Role'] + " - " + df_workflows['Supplier']
@@ -143,7 +145,6 @@ pricing_data = [
 df_pricing = pd.DataFrame(pricing_data)
 
 # 3. T&M RATE CARD (MONTHLY ESTIMATES)
-# This is a placeholder. In a real app, you might load this from a CSV.
 tm_rates = {
     'Recruiter': {'High Cost': 7000, 'Medium Cost': 5500, 'Low Cost': 3500},
     'Team Lead': {'High Cost': 9000, 'Medium Cost': 7000, 'Low Cost': 4500},
@@ -466,9 +467,6 @@ if mode == "📝 Budget Builder":
         df_display['CPOA ($)'] = df_display['CPOA ($)'].apply(lambda x: f"${x:,.0f}")
         
         # Add T&M Indicator to Demand
-        # If Type is T&M, maybe format demand differently? 
-        # For now, we just leave it as is, since "Workflow" has (T&M) appended.
-        
         for col in ["Lon OA", "War OA", "Dub OA", "Bir OA"]:
             df_display[col] = df_display[col].apply(lambda x: f"{x:.1f}")
 
