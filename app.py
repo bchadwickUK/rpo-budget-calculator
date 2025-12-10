@@ -523,14 +523,14 @@ elif mode == "⚡ Quick Compare":
         # Group by Scenario and Supplier to handle multiple lines of same supplier
         df_chart_grouped = df_chart.groupby(['Scenario', 'Supplier'])['Cost USD'].sum().reset_index()
 
-        # Create Stacked Bar Chart
+        # Create Stacked Bar Chart with Google Colors
         chart = (
             alt.Chart(df_chart_grouped)
             .mark_bar()
             .encode(
                 x=alt.X('Scenario', axis=None),
                 y=alt.Y('Cost USD', axis=alt.Axis(format='$,.0f', title='Total Spend')),
-                color=alt.Color('Supplier', scale=alt.Scale(scheme='tableau10')),
+                color=alt.Color('Supplier', scale=alt.Scale(domain=['RSR', 'KF', 'Cielo'], range=['#4285F4', '#DB4437', '#F4B400'])),
                 tooltip=['Scenario', 'Supplier', alt.Tooltip('Cost USD', format='$,.0f')]
             )
             .properties(height=400)
