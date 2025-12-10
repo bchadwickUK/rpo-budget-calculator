@@ -72,7 +72,6 @@ if 'scenario_b' not in st.session_state:
     st.session_state.scenario_b = []
 
 # 1. WORKFLOW DATA
-# FIX: Re-added 'Avg PPR' column so T&M logic can reference it
 workflow_data = {
     'Role': [
         'SWE', 'SWE', 'SWE',
@@ -81,13 +80,12 @@ workflow_data = {
         'GBOFx', 'GBOFx', 'GBOFx'
     ],
     'Supplier': ['RSR', 'KF', 'Cielo'] * 4,
-    'Pricing Tier': ['T6', 'T6', 'T6'] * 3 + ['T4', 'T4', 'T4'],
-    'Avg PPR': [6, 6, 6, 6.5, 6.5, 6.5, 6, 6, 6, 9, 9, 9] 
+    'Pricing Tier': ['T6', 'T6', 'T6'] * 3 + ['T4', 'T4', 'T4']
 }
 df_workflows = pd.DataFrame(workflow_data)
 df_workflows['Workflow Name'] = df_workflows['Role'] + " - " + df_workflows['Supplier']
 
-# 2. PRICING DATA (UNIT PRICE)
+# 2. PRICING DATA
 pricing_data = [
     # --- CIELO (BLENDED RATES) ---
     {'Supplier': 'Cielo', 'Tier': 'T1', 'Cost_Type': 'Blended', 'Price': 1940},
@@ -144,22 +142,11 @@ pricing_data = [
 ]
 df_pricing = pd.DataFrame(pricing_data)
 
-# 3. T&M RATE CARD (MONTHLY ESTIMATES)
-tm_rates = {
-    'Recruiter': {'High Cost': 7000, 'Medium Cost': 5500, 'Low Cost': 3500},
-    'Team Lead': {'High Cost': 9000, 'Medium Cost': 7000, 'Low Cost': 4500},
-    'Ops Manager': {'High Cost': 11000, 'Medium Cost': 9000, 'Low Cost': 6000}
-}
-
 # --- FUNCTIONS ---
 def get_price(supplier, tier, cost_type):
     row = df_pricing[(df_pricing['Supplier'] == supplier) & (df_pricing['Tier'] == tier) & (df_pricing['Cost_Type'] == cost_type)]
     if not row.empty: return row.iloc[0]['Price']
     return 0
-
-def get_tm_rate(role, cost_type):
-    # Fallback to Medium if specific cost type missing
-    return tm_rates.get(role, {}).get(cost_type, 5000)
 
 # --- SIDEBAR ---
 with st.sidebar:
@@ -200,69 +187,40 @@ with st.sidebar:
         (df_workflows['Supplier'] == selected_supplier)
     ].iloc[0]
 
+    st.caption(f"Standard Tier: {wf_details['Pricing Tier']}")
+    
     curr_supplier = wf_details['Supplier']
     wf_name_backend = wf_details['Workflow Name']
 
-    # --- PAYMENT MODEL TOGGLE ---
-    st.divider()
-    pay_model = st.radio("💰 Payment Model", ["Unit Price (Per Hire)", "Time & Materials (Capacity)"])
-    
-    if pay_model == "Unit Price (Per Hire)":
-        st.caption(f"Standard Tier: {wf_details['Pricing Tier']}")
-        # Simplified Tier Override
-        with st.expander("🛠️ Manual Tier Override"):
-            override_active = st.checkbox("Enable Override", value=False)
-            if override_active:
-                calc_tier = st.selectbox("Select Tier:", ['T1','T2','T3','T4','T5','T6','T7'], index=['T1','T2','T3','T4','T5','T6','T7'].index(wf_details['Pricing Tier']))
-            else:
-                calc_tier = wf_details['Pricing Tier']
-    else:
-        # T&M SETTINGS
-        st.caption("ℹ️ Pricing based on Headcount + Support Ratios")
-        # Default T&M PPR (only for prediction)
-        tm_ppr = st.number_input("Target PPR (for Vol Prediction)", value=float(wf_details['Avg PPR']), step=0.5)
-
-    # --- INPUT GROUP 2: VOLUME / HEADCOUNT ---
-    st.divider()
-    
-    # INITIALIZE VARIABLES
-    use_quarterly = False
-    q1_vol, q2_vol, q3_vol, q4_vol = 0, 0, 0, 0
-    total_tm_monthly_cost = 0 # for T&M logic
-    
-    if pay_model == "Unit Price (Per Hire)":
-        # 1. Volume Input (Conditional Layout)
-        st.write("📊 **Volume & Phasing**")
-        use_quarterly = st.checkbox("Enable Quarterly Phasing", value=False)
-
-        if use_quarterly:
-            cq1, cq2 = st.columns(2)
-            cq3, cq4 = st.columns(2)
-            with cq1: q1_vol = st.number_input("Q1", min_value=0, value=10)
-            with cq2: q2_vol = st.number_input("Q2", min_value=0, value=10)
-            with cq3: q3_vol = st.number_input("Q3", min_value=0, value=10)
-            with cq4: q4_vol = st.number_input("Q4", min_value=0, value=10)
-            total_demand = q1_vol + q2_vol + q3_vol + q4_vol
-            st.caption(f"**Total Annual Demand: {total_demand}**")
+    # Simplified Tier Override
+    with st.expander("🛠️ Manual Tier Override"):
+        override_active = st.checkbox("Enable Override", value=False)
+        if override_active:
+            calc_tier = st.selectbox("Select Tier:", ['T1','T2','T3','T4','T5','T6','T7'], index=['T1','T2','T3','T4','T5','T6','T7'].index(wf_details['Pricing Tier']))
         else:
-            total_demand = st.number_input("Annual Demand", min_value=1, value=50)
-            
-    else:
-        # T&M HEADCOUNT INPUT
-        st.write("👥 **Core Capacity**")
-        hc_recruiters = st.number_input("Recruiter Headcount", min_value=1, value=12)
-        
-        # RATIO CALCULATOR
-        hc_tl = hc_recruiters / 12
-        hc_ops = hc_recruiters / 50
-        
-        st.info(f"➕ **Support Added:** {hc_tl:.2f} TLs | {hc_ops:.2f} Ops Mgr")
-        
-        # PREDICTED VOLUME
-        predicted_annual_vol = hc_recruiters * tm_ppr * 12
-        st.caption(f"🎯 **Predicted Annual Hires:** {predicted_annual_vol:,.0f}")
-        total_demand = predicted_annual_vol # Use this for the "Demand" column
+            calc_tier = wf_details['Pricing Tier']
 
+    # --- INPUT GROUP 2: VOLUME & LOCATION ---
+    st.divider()
+    
+    # 1. Volume Input (Conditional Layout)
+    st.write("📊 **Volume & Phasing**")
+    use_quarterly = st.checkbox("Enable Quarterly Phasing", value=False)
+
+    if use_quarterly:
+        cq1, cq2 = st.columns(2)
+        cq3, cq4 = st.columns(2)
+        with cq1: q1_vol = st.number_input("Q1", min_value=0, value=10)
+        with cq2: q2_vol = st.number_input("Q2", min_value=0, value=10)
+        with cq3: q3_vol = st.number_input("Q3", min_value=0, value=10)
+        with cq4: q4_vol = st.number_input("Q4", min_value=0, value=10)
+        total_demand = q1_vol + q2_vol + q3_vol + q4_vol
+        st.caption(f"**Total Annual Demand: {total_demand}**")
+    else:
+        total_demand = st.number_input("Annual Demand", min_value=1, value=50)
+        # Store 0 for breakdown if not used
+        q1_vol, q2_vol, q3_vol, q4_vol = 0, 0, 0, 0
+    
     # 2. Location Split (Grid Layout)
     st.write("📍 **Location Split (%)**")
     
@@ -304,96 +262,48 @@ with st.sidebar:
         btn_color = "primary"
 
     if st.button(btn_text, disabled=btn_disabled, type="primary" if btn_color=="primary" else "secondary", use_container_width=True):
-        
-        # --- COST CALCULATION ENGINE ---
-        
-        if pay_model == "Unit Price (Per Hire)":
-            # UNIT PRICE LOGIC
-            if is_blended:
-                blended_price = get_price(curr_supplier, calc_tier, 'Blended')
-                total_cost = total_demand * blended_price
-                
-                # Zero out locations for Blended
-                vol_lon, vol_war, vol_dub, vol_bir = 0, 0, 0, 0
-                
-            else:
-                vol_lon = total_demand * (lon_pct/100)
-                vol_war = total_demand * (war_pct/100)
-                vol_dub = total_demand * (dub_pct/100)
-                vol_bir = total_demand * (bir_pct/100)
-                
-                price_lon = get_price(curr_supplier, calc_tier, 'High Cost')
-                price_war = get_price(curr_supplier, calc_tier, 'Low Cost')
-                price_bir = get_price(curr_supplier, calc_tier, 'Medium/Low Cost')
-                
-                if curr_supplier == 'KF': price_dub = get_price(curr_supplier, calc_tier, 'High Cost')
-                else: price_dub = get_price(curr_supplier, calc_tier, 'Medium Cost')
-
-                total_cost = (vol_lon * price_lon) + (vol_war * price_war) + (vol_dub * price_dub) + (vol_bir * price_bir)
-            
-            wf_display_name = wf_name_backend
-            if override_active: wf_display_name += f" (Tier: {calc_tier})"
-            
+        # 1. CALCULATE COST
+        if is_blended:
+            vol_lon = 0
+            vol_war = 0
+            vol_dub = 0
+            vol_bir = 0
+            blended_price = get_price(curr_supplier, calc_tier, 'Blended')
+            total_cost = total_demand * blended_price
         else:
-            # T&M LOGIC (CAPACITY)
-            # 1. Calculate Weighted Monthly Rate based on Location Split
-            # Note: We assume the same split applies to Recs, TLs, and Ops for simplicity (The "Mirrored Split")
-            
-            def get_weighted_rate(role):
-                r_lon = get_tm_rate(role, 'High Cost')
-                r_war = get_tm_rate(role, 'Low Cost')
-                r_bir = get_tm_rate(role, 'Medium Cost') # Approx mapping
-                r_dub = get_tm_rate(role, 'High Cost') if curr_supplier == 'KF' else get_tm_rate(role, 'Medium Cost')
-                
-                if is_blended: return get_tm_rate(role, 'Medium Cost') # Fallback for Cielo
-                
-                return (r_lon * lon_pct/100) + (r_war * war_pct/100) + (r_dub * dub_pct/100) + (r_bir * bir_pct/100)
-
-            rate_rec = get_weighted_rate('Recruiter')
-            rate_tl = get_weighted_rate('Team Lead')
-            rate_ops = get_weighted_rate('Ops Manager')
-            
-            monthly_basket = (hc_recruiters * rate_rec) + (hc_tl * rate_tl) + (hc_ops * rate_ops)
-            total_cost = monthly_basket * 12 # Annualized
-            
-            # Location Volumes (Projected)
             vol_lon = total_demand * (lon_pct/100)
             vol_war = total_demand * (war_pct/100)
             vol_dub = total_demand * (dub_pct/100)
             vol_bir = total_demand * (bir_pct/100)
             
-            wf_display_name = f"{wf_name_backend} (T&M)"
-
-        # --- QUARTERLY BREAKDOWN ---
-        # Calculate Quarterly Costs
-        # For T&M, we assume flat cost per quarter = Annual / 4
-        # For Unit Price, we use the phasing if active
-        
-        unit_price = total_cost / total_demand if total_demand > 0 else 0 # Effective Unit Price
-        
-        if pay_model == "Unit Price (Per Hire)" and use_quarterly:
-             c_q1 = q1_vol * unit_price
-             c_q2 = q2_vol * unit_price
-             c_q3 = q3_vol * unit_price
-             c_q4 = q4_vol * unit_price
-        else:
-            # Flat distribution (used for T&M or Annual Unit Price)
-            # If T&M, we assume flat capacity. 
-            # If Annual Unit Price, we split evenly for cash flow view
-            c_q1 = total_cost / 4
-            c_q2 = total_cost / 4
-            c_q3 = total_cost / 4
-            c_q4 = total_cost / 4
+            price_lon = get_price(curr_supplier, calc_tier, 'High Cost')
+            price_war = get_price(curr_supplier, calc_tier, 'Low Cost')
+            price_bir = get_price(curr_supplier, calc_tier, 'Medium/Low Cost')
             
-            # Populate volumes evenly too if not manual
-            if total_demand > 0:
-                q1_vol = q2_vol = q3_vol = q4_vol = total_demand / 4
+            if curr_supplier == 'KF': price_dub = get_price(curr_supplier, calc_tier, 'High Cost')
+            else: price_dub = get_price(curr_supplier, calc_tier, 'Medium Cost')
+
+            total_cost = (vol_lon * price_lon) + (vol_war * price_war) + (vol_dub * price_dub) + (vol_bir * price_bir)
+            
+        wf_display_name = wf_name_backend
+        if override_active: wf_display_name += f" (Override: {calc_tier})"
+
+        # Calculate Quarterly Costs
+        unit_price = total_cost / total_demand if total_demand > 0 else 0
+        
+        if use_quarterly:
+            c_q1 = q1_vol * unit_price
+            c_q2 = q2_vol * unit_price
+            c_q3 = q3_vol * unit_price
+            c_q4 = q4_vol * unit_price
+        else:
+            c_q1, c_q2, c_q3, c_q4 = 0, 0, 0, 0
 
         new_line = {
             "Workflow": wf_display_name,
             "Supplier": curr_supplier,
             "Demand": total_demand,
-            "Type": "T&M" if pay_model != "Unit Price (Per Hire)" else "Unit",
+            "Tier": calc_tier,
             "Total Cost (€)": total_cost,
             "Lon OA": vol_lon,
             "War OA": vol_war,
@@ -433,7 +343,7 @@ if mode == "📝 Budget Builder":
         total_vol = df_results['Demand'].sum()
         avg_cpoa = total_usd / total_vol if total_vol > 0 else 0
         
-        # QUARTERLY TOTALS
+        # QUARTERLY TOTALS (Calculated from lines that used phasing)
         q1_tot = df_results['Q1 Cost'].sum() * usd_rate
         q2_tot = df_results['Q2 Cost'].sum() * usd_rate
         q3_tot = df_results['Q3 Cost'].sum() * usd_rate
@@ -443,7 +353,7 @@ if mode == "📝 Budget Builder":
         c1, c2, c3 = st.columns(3)
         c1.metric("Forecast (USD)", f"${total_usd:,.0f}")
         c2.metric("Forecast (EUR)", f"€{total_eur:,.0f}")
-        c3.metric("Avg CPOA (Effective)", f"${avg_cpoa:,.0f}")
+        c3.metric("Avg CPOA", f"${avg_cpoa:,.0f}")
         
         # ROW 2: QUARTERLY BREAKDOWN
         cq1, cq2, cq3, cq4 = st.columns(4)
@@ -466,7 +376,6 @@ if mode == "📝 Budget Builder":
         df_display['Total Cost (€)'] = df_display['Total Cost (€)'].apply(lambda x: f"€{x:,.0f}")
         df_display['CPOA ($)'] = df_display['CPOA ($)'].apply(lambda x: f"${x:,.0f}")
         
-        # Add T&M Indicator to Demand
         for col in ["Lon OA", "War OA", "Dub OA", "Bir OA"]:
             df_display[col] = df_display[col].apply(lambda x: f"{x:.1f}")
 
@@ -490,8 +399,7 @@ if mode == "📝 Budget Builder":
                 ]
                 
                 for q_name, q_vol, q_cost in quarters:
-                    # Show all quarters if Demand exists
-                    if row['Demand'] > 0:
+                    if row['Q1 Vol'] > 0 or row['Q2 Vol'] > 0 or row['Q3 Vol'] > 0 or row['Q4 Vol'] > 0:
                         # Calculate Loc Splits for this quarter
                         l_o = q_vol * (row['Lon %'] / 100)
                         w_o = q_vol * (row['War %'] / 100)
@@ -503,7 +411,7 @@ if mode == "📝 Budget Builder":
                         vertical_rows.append({
                             "Workflow": row['Workflow'],
                             "Period": q_name,
-                            "Est. Vol": f"{q_vol:.1f}", # Renamed for clarity
+                            "Volume": q_vol,
                             "Lon": f"{l_o:.1f}",
                             "War": f"{w_o:.1f}",
                             "Dub": f"{d_o:.1f}",
@@ -533,7 +441,7 @@ if mode == "📝 Budget Builder":
             )
             
         with c_m2:
-            del_options = [f"{i+1}. {row['Workflow']} ({row['Demand']:.0f})" for i, row in enumerate(st.session_state.budget_lines)]
+            del_options = [f"{i+1}. {row['Workflow']} ({row['Demand']})" for i, row in enumerate(st.session_state.budget_lines)]
             selected_del = st.selectbox("Select line to remove", del_options, label_visibility="collapsed")
             
             if st.button("🗑️ Remove Line", use_container_width=True):
