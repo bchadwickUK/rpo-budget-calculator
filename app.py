@@ -80,8 +80,7 @@ workflow_data = {
         'GBOFx', 'GBOFx', 'GBOFx'
     ],
     'Supplier': ['RSR', 'KF', 'Cielo'] * 4,
-    'Pricing Tier': ['T6', 'T6', 'T6'] * 3 + ['T4', 'T4', 'T4'],
-    'Avg PPR': [6, 6, 6, 6.5, 6.5, 6.5, 6, 6, 6, 9, 9, 9]
+    'Pricing Tier': ['T6', 'T6', 'T6'] * 3 + ['T4', 'T4', 'T4']
 }
 df_workflows = pd.DataFrame(workflow_data)
 df_workflows['Workflow Name'] = df_workflows['Role'] + " - " + df_workflows['Supplier']
@@ -188,20 +187,17 @@ with st.sidebar:
         (df_workflows['Supplier'] == selected_supplier)
     ].iloc[0]
 
-    st.caption(f"Tier: {wf_details['Pricing Tier']} | PPR: {wf_details['Avg PPR']}")
+    st.caption(f"Standard Tier: {wf_details['Pricing Tier']}")
     
     curr_supplier = wf_details['Supplier']
     wf_name_backend = wf_details['Workflow Name']
 
-    # Efficiency Settings
-    with st.expander("🛠️ Efficiency / PPR"):
-        efficiency_mode = st.checkbox("Override Defaults", value=False)
-        if efficiency_mode:
-            st.info(f"Modifying {curr_supplier}")
-            calc_ppr = st.number_input("Target PPR:", value=float(wf_details['Avg PPR']), step=0.5)
-            calc_tier = st.selectbox("New Tier:", ['T1','T2','T3','T4','T5','T6','T7'], index=['T1','T2','T3','T4','T5','T6','T7'].index(wf_details['Pricing Tier']))
+    # Simplified Tier Override
+    with st.expander("🛠️ Manual Tier Override"):
+        override_active = st.checkbox("Enable Override", value=False)
+        if override_active:
+            calc_tier = st.selectbox("Select Tier:", ['T1','T2','T3','T4','T5','T6','T7'], index=['T1','T2','T3','T4','T5','T6','T7'].index(wf_details['Pricing Tier']))
         else:
-            calc_ppr = wf_details['Avg PPR']
             calc_tier = wf_details['Pricing Tier']
 
     # --- INPUT GROUP 2: VOLUME & LOCATION ---
@@ -222,7 +218,7 @@ with st.sidebar:
         st.caption(f"**Total Annual Demand: {total_demand}**")
     else:
         total_demand = st.number_input("Annual Demand", min_value=1, value=50)
-        # Store 0 for breakdown if not used, to keep data clean
+        # Store 0 for breakdown if not used
         q1_vol, q2_vol, q3_vol, q4_vol = 0, 0, 0, 0
     
     # 2. Location Split (Grid Layout)
@@ -289,12 +285,10 @@ with st.sidebar:
 
             total_cost = (vol_lon * price_lon) + (vol_war * price_war) + (vol_dub * price_dub) + (vol_bir * price_bir)
             
-        recruiters_needed = total_demand / calc_ppr
-        
         wf_display_name = wf_name_backend
-        if efficiency_mode: wf_display_name += f" (Eff: {calc_tier})"
+        if override_active: wf_display_name += f" (Override: {calc_tier})"
 
-        # Calculate Quarterly Costs (Pro-rata based on volume or manual entry)
+        # Calculate Quarterly Costs
         unit_price = total_cost / total_demand if total_demand > 0 else 0
         
         if use_quarterly:
@@ -303,7 +297,6 @@ with st.sidebar:
             c_q3 = q3_vol * unit_price
             c_q4 = q4_vol * unit_price
         else:
-            # Leave as 0 for non-phased lines
             c_q1, c_q2, c_q3, c_q4 = 0, 0, 0, 0
 
         new_line = {
@@ -312,11 +305,12 @@ with st.sidebar:
             "Demand": total_demand,
             "Tier": calc_tier,
             "Total Cost (€)": total_cost,
-            "Recruiters": recruiters_needed,
             "Lon OA": vol_lon,
             "War OA": vol_war,
             "Dub OA": vol_dub,
             "Bir OA": vol_bir,
+            # STORE PCT FOR BREAKDOWN
+            "Lon %": lon_pct, "War %": war_pct, "Dub %": dub_pct, "Bir %": bir_pct,
             # QUARTERLY DATA
             "Q1 Vol": q1_vol, "Q2 Vol": q2_vol, "Q3 Vol": q3_vol, "Q4 Vol": q4_vol,
             "Q1 Cost": c_q1, "Q2 Cost": c_q2, "Q3 Cost": c_q3, "Q4 Cost": c_q4
@@ -345,20 +339,18 @@ if mode == "📝 Budget Builder":
         
         total_eur = df_results['Total Cost (€)'].sum()
         total_usd = total_eur * usd_rate
-        total_hc = df_results['Recruiters'].sum()
         total_vol = df_results['Demand'].sum()
         avg_cpoa = total_usd / total_vol if total_vol > 0 else 0
         
-        c1, c2, c3, c4 = st.columns(4)
+        c1, c2, c3 = st.columns(3)
         c1.metric("Forecast (USD)", f"${total_usd:,.0f}")
         c2.metric("Forecast (EUR)", f"€{total_eur:,.0f}")
         c3.metric("Avg CPOA", f"${avg_cpoa:,.0f}")
-        c4.metric("Headcount", f"{total_hc:.1f}")
         
         st.divider()
         
         # --- VIEW TOGGLE ---
-        view_mode = st.radio("Table View:", ["Summary", "💸 Cash Flow (Quarterly)"], horizontal=True, label_visibility="collapsed")
+        view_mode = st.radio("Table View:", ["Summary", "📅 Quarterly Detail"], horizontal=True, label_visibility="collapsed")
 
         # PREPARE DISPLAY DATA
         df_display = df_results.copy()
@@ -368,7 +360,6 @@ if mode == "📝 Budget Builder":
         df_display['Total Cost ($)'] = (df_display['Total Cost (€)'] * usd_rate).apply(lambda x: f"${x:,.0f}")
         df_display['Total Cost (€)'] = df_display['Total Cost (€)'].apply(lambda x: f"€{x:,.0f}")
         df_display['CPOA ($)'] = df_display['CPOA ($)'].apply(lambda x: f"${x:,.0f}")
-        df_display['Recruiters'] = df_display['Recruiters'].apply(lambda x: f"{x:.1f}")
         
         for col in ["Lon OA", "War OA", "Dub OA", "Bir OA"]:
             df_display[col] = df_display[col].apply(lambda x: f"{x:.1f}")
@@ -376,33 +367,58 @@ if mode == "📝 Budget Builder":
         if view_mode == "Summary":
             # EXISTING SUMMARY VIEW
             st.dataframe(
-                df_display[["Workflow", "Supplier", "Demand", "Lon OA", "War OA", "Dub OA", "Bir OA", "CPOA ($)", "Total Cost ($)", "Recruiters"]], 
+                df_display[["Workflow", "Supplier", "Demand", "Lon OA", "War OA", "Dub OA", "Bir OA", "CPOA ($)", "Total Cost ($)"]], 
                 use_container_width=True
             )
         else:
-            # NEW CASH FLOW VIEW
-            df_cash = df_display.copy() # Use the already formatted location columns
+            # NEW VERTICAL QUARTERLY VIEW
+            vertical_rows = []
             
-            # Format Quarter Costs to USD
-            for q in ["Q1", "Q2", "Q3", "Q4"]:
-                col_name_usd = f"{q} ($)"
-                # Calculate USD value from raw results (not display) to avoid string issues
-                # We need to map back to original indices if we had sorted, but here order is preserved
-                raw_col_name = f"{q} Cost"
+            for index, row in df_results.iterrows():
+                # Process each quarter
+                quarters = [
+                    ("Q1", row['Q1 Vol'], row['Q1 Cost']),
+                    ("Q2", row['Q2 Vol'], row['Q2 Cost']),
+                    ("Q3", row['Q3 Vol'], row['Q3 Cost']),
+                    ("Q4", row['Q4 Vol'], row['Q4 Cost'])
+                ]
                 
-                # We calculate USD from the original raw DF
-                usd_vals = df_results[raw_col_name] * usd_rate
-                df_cash[col_name_usd] = usd_vals.apply(lambda x: f"${x:,.0f}" if x > 0 else "-")
-            
-            # Combine Operational (Location) + Financial (Quarterly)
-            cols_to_show = [
-                "Workflow", "Supplier", "Demand", 
-                "Lon OA", "War OA", "Dub OA", "Bir OA", # Operational
-                "Q1 ($)", "Q2 ($)", "Q3 ($)", "Q4 ($)", # Financial
-                "Total Cost ($)"
-            ]
-            
-            st.dataframe(df_cash[cols_to_show], use_container_width=True)
+                for q_name, q_vol, q_cost in quarters:
+                    # Only show rows if there is volume or cost, or if annual demand was entered without phasing (show even split or 0?)
+                    # If quarterly wasn't used, q_vol is 0. We skip to keep it clean, or we can show Q1-Q4 as 0.
+                    # Let's show all 4 quarters if 'Total Demand' > 0 to be consistent.
+                    
+                    if q_vol == 0 and row['Demand'] > 0 and row['Q1 Vol'] == 0: 
+                         # Special case: Annual demand was used, not quarterly. 
+                         # We could show "N/A" or just one row. But user wants specific breakdown.
+                         # Let's Skip this logic for now and only show if Quarterly was used.
+                         pass
+                    
+                    if row['Q1 Vol'] > 0 or row['Q2 Vol'] > 0: # Check if quarterly inputs were actually used
+                        # Calculate Loc Splits for this quarter
+                        l_o = q_vol * (row['Lon %'] / 100)
+                        w_o = q_vol * (row['War %'] / 100)
+                        d_o = q_vol * (row['Dub %'] / 100)
+                        b_o = q_vol * (row['Bir %'] / 100)
+                        
+                        cost_usd = q_cost * usd_rate
+                        
+                        vertical_rows.append({
+                            "Workflow": row['Workflow'],
+                            "Period": q_name,
+                            "Volume": q_vol,
+                            "Lon": f"{l_o:.1f}",
+                            "War": f"{w_o:.1f}",
+                            "Dub": f"{d_o:.1f}",
+                            "Bir": f"{b_o:.1f}",
+                            "Cost ($)": f"${cost_usd:,.0f}"
+                        })
+
+            if len(vertical_rows) > 0:
+                df_vert = pd.DataFrame(vertical_rows)
+                st.dataframe(df_vert, use_container_width=True)
+            else:
+                st.info("ℹ️ No quarterly data found. Check 'Enable Quarterly Phasing' when adding lines to see this view.")
         
         st.divider()
         st.write("### 🛠️ Manage Data")
@@ -486,7 +502,7 @@ elif mode == "⚡ Quick Compare":
         df_display = df_combined.copy()
         df_display['Total Cost ($)'] = (df_display['Total Cost (€)'] * usd_rate)
         
-        cols = ['Scenario', 'Workflow', 'Supplier', 'Demand', 'Total Cost ($)', 'Recruiters', 'Lon OA', 'War OA', 'Dub OA', 'Bir OA']
+        cols = ['Scenario', 'Workflow', 'Supplier', 'Demand', 'Total Cost ($)', 'Lon OA', 'War OA', 'Dub OA', 'Bir OA']
         df_export = df_display[cols]
         
         st.dataframe(df_export.style.format({'Total Cost ($)': "${:,.0f}"}), use_container_width=True)
